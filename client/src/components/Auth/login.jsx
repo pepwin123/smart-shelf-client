@@ -13,7 +13,8 @@ export default function LoginPage({setUser}) {
     const navigate = useNavigate();
 
     const handleChange = (e) =>{
-        setFormData({...formData, [e.target.name]: e.target.value})
+        const {name,value} = e.target
+        setFormData({...formData, [name]: value})
     }
 
     const handleSubmit = async (e) => {
@@ -21,6 +22,7 @@ export default function LoginPage({setUser}) {
         try {
             const res = await axios.post("/api/users/login", formData);
             localStorage.setItem("token", res.data.token);
+            console.log(res.data)
             setUser(res.data.user);
             console.log("login successful", res.data);
             navigate('/home');
