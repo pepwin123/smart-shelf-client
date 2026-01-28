@@ -42,27 +42,51 @@ export const signup = async (req, res) => {
     const { username, email, password, confirmpassword } = req.body;
 
     if (password !== confirmpassword) {
-      return res.status(400).json({ success: false, message: "Passwords do not match" });
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match",
+      });
     }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ success: false, message: "Email already exists" });
+      return res.status(400).json({
+        success: false,
+        message: "Email already exists",
+      });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await User.create({ username, email, password: hashedPassword });
+    const user = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+    });
+
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
     return res.status(201).json({
       success: true,
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+      },
       message: "User created successfully",
-      user: { id: user._id, email: user.email, username: user.username }
     });
-
   } catch (error) {
-    console.error("SIGNUP ERROR:", error);
-    return res.status(500).json({ success: false, message: "Signup failed", error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Signup failed",
+      error: error.message,
+    });
   }
 };
+

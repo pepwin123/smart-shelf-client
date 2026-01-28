@@ -5,6 +5,7 @@ import Home from "./components/Home/home";
 import Navbar from "./components/Navbar/navbar";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import Register from "./components/Auth/register";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -46,6 +47,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LoginPage setUser={setUser}/>} />
         <Route path="/home" element={<Home />}/>
+        <Route path="/register" element={<Register setUser={setUser}/>} />
       </Routes>
     </BrowserRouter>
   );

@@ -5,7 +5,7 @@ import auth from "../Middleware/authMiddleware.js"
 const router = express.Router();
 
 router.post('/login',login);
-router.post('/signup', signup);
+router.post('/register', signup);
 
 router.get("/me", auth, (req, res) => {
   res.status(200).json(req.user);
