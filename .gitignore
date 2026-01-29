@@ -1,0 +1,12 @@
+# dependencies
+node_modules
+server/node_modules
+client/node_modules
+
+# env
+.env
+
+# build
+dist
+build
+.vite
