@@ -9,7 +9,7 @@ export default function Home() {
     return (
         <div>
             <Header />
-            <div className="min-h-screen">
+            <div className="min-h-screen bg-neutral-300">
                 <SearchBar onResults={setBooks} />
                 <SearchResults books={books} />
             </div>

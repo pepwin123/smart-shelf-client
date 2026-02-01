@@ -1,18 +1,114 @@
-import express from "express";
 import axios from "axios";
+import Book from "../models/bookModel.js";
 
-const router = express.Router();
+export const searchBooks = async (req, res, next) => {
+  try {
+    const { q, page = 1, subject, year, availability } = req.query;
 
-router.get("/search", async (req, res) => {
-    try{
-        const { q, page=1 } = req.query;
-
-        const response = await axios.get("https://openlibrary.org/search.json", {
-            params:{q,page,limit: 10, fields: "key,title,author_name,first_publish_year,cover_i,subject",},
-        });
-    } catch(err){
-        res.status(500).json({success: false, message:"Search failed"})
+    if (!q) {
+      return res.status(400).json({
+        success: false,
+        message: "Search query is required",
+      });
     }
-});
 
-export default router;
+    const response = await axios.get(
+      "https://openlibrary.org/search.json",
+      {
+        params: {
+          q,
+          page,
+          limit: 10,
+          fields:
+            "key,title,author_name,first_publish_year,cover_i,subject,has_fulltext,public_scan_b",
+        },
+      }
+    );
+
+    let books = response.data.docs;
+
+    // 📅 YEAR FILTER (single year)
+    if (year) {
+      books = books.filter(
+        (book) => book.first_publish_year === Number(year)
+      );
+    }
+
+    // 📘 SUBJECT FILTER
+    if (subject) {
+      books = books.filter((book) =>
+        book.subject?.some((s) =>
+          s.toLowerCase().includes(subject.toLowerCase())
+        )
+      );
+    }
+
+    // 📖 AVAILABILITY FILTER
+    if (availability === "readable") {
+      books = books.filter((book) => book.has_fulltext === true);
+    }
+
+    if (availability === "borrowable") {
+      books = books.filter((book) => book.public_scan_b === true);
+    }
+
+    res.json({
+      success: true,
+      count: books.length,
+      books,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const saveBook = async (req, res, next) => {
+  try {
+    const {
+      key,
+      title,
+      author_name,
+      first_publish_year,
+      cover_i,
+      subject,
+      has_fulltext,
+      public_scan_b,
+    } = req.body;
+
+    const book = await Book.create({
+      openLibraryId: key,
+      title,
+      authors: author_name,
+      firstPublishYear: first_publish_year,
+      coverId: cover_i,
+      subjects: subject,
+      availability: {
+        readable: has_fulltext,
+        borrowable: public_scan_b,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Book saved successfully",
+      book,
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Book already saved",
+      });
+    }
+    next(error);
+  }
+};
+
+export const getSavedBooks = async (req, res, next) => {
+  try {
+    const books = await Book.find().sort({ createdAt: -1 });
+    res.json({ success: true, books });
+  } catch (error) {
+    next(error);
+  }
+};

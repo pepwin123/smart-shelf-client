@@ -1,17 +1,24 @@
-import mongoose from "mongoose"
+import mongoose from "mongoose";
 
 const bookSchema = new mongoose.Schema(
-    {
-        openLibraryId: { type: String, unique: true},
-        title: String,
-        authors: [String],
-        firstPublishYear: Number,
-        coverId: Number,
-        subjects: [String],
+  {
+    openLibraryId: {
+      type: String,
+      required: true,
+      unique: true,
     },
-    { timestamps: true }
+    title: String,
+    authors: [String],
+    firstPublishYear: Number,
+    coverId: Number,
+    subjects: [String],
+    availability: {
+      readable: Boolean,
+      borrowable: Boolean,
+    },
+  },
+  { timestamps: true }
 );
 
-const User = mongoose.model("Book", bookSchema);
-
-export default User;
+const Book = mongoose.model("Book", bookSchema);
+export default Book;
