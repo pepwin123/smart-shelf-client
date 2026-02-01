@@ -5,7 +5,7 @@ import profile from "../../assets/user.png"
 import downarrow from "../../assets/down-arrow.png"
 
 export default function Header() {
-     const username = JSON.parse(localStorage.getItem("user") || "{}");
+    const username = JSON.parse(localStorage.getItem("user") || "{}");
     console.log(username);
     const [open, setOpen] = useState(false);
     const dropdownRef = useRef(null);
