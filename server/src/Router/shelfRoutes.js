@@ -1,18 +1,10 @@
 import express from "express";
-import {
-  addBookToShelf,
-  getShelfByWorkspace,
-  moveBook,
-  removeBook,
-} from "../controllers/shelf.controller.js";
-import auth from "../middleware/auth.js";
-import isWorkspaceMember from "../Middleware/isWorkspaceMember.js";
 
 const router = express.Router();
 
-router.post("/", auth, isWorkspaceMember, addBookToShelf);
-router.get("/:workspaceId", auth, isWorkspaceMember, getShelfByWorkspace);
-router.patch("/:id/move", auth, moveBook);
-router.delete("/:id", auth, removeBook);
+// Placeholder routes for shelves — implement real logic in Controllers later
+router.get('/', (req, res) => {
+  res.status(200).json({ success: true, message: 'Shelves route is working' });
+});
 
 export default router;
