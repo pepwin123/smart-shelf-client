@@ -1,6 +1,5 @@
 import ActivityLog from "../Models/activityLogModel.js";
 
-// Log activity to database
 export const logActivity = async (req, res, next) => {
   try {
     const { workspaceId, action, targetType, targetId, targetName, details } =
@@ -143,6 +142,7 @@ export const getActivityStats = async (req, res, next) => {
         totalActivities: stats.reduce((sum, s) => sum + s.count, 0),
       },
     });
+    
   } catch (error) {
     return res.status(500).json({
       success: false,

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import profile from "../../assets/user.png"
 import downarrow from "../../assets/down-arrow.png"
 
-export default function Header() {
+export default function Header({setUser}) {
     const username = JSON.parse(localStorage.getItem("user") || "{}");
     console.log(username);
     const [open, setOpen] = useState(false);
@@ -13,6 +13,7 @@ export default function Header() {
     const handleLogout = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        setUser(null);
         navigate("/");
     };
     useEffect(() => {
@@ -31,7 +32,7 @@ export default function Header() {
 
             <div className="flex items-center gap-5 text-black">
                 <Link to="/" className="py-1 px-3 text-lg font-light text-white rounded-xl hover:bg-slate-700 transition duration-300">Discovery Engine</Link>
-                <Link to="/" className="py-1 px-3 text-lg font-light text-white rounded-xl hover:bg-slate-700 transition duration-300">Collabrative Workspace</Link>
+                <Link to="/workspace" className="py-1 px-3 text-lg font-light text-white rounded-xl hover:bg-slate-700 transition duration-300">Collabrative Workspace</Link>
                 <Link to="/" className="py-1 px-3 text-lg font-light text-white rounded-xl hover:bg-slate-700 transition duration-300">Research Notes</Link>
             </div>
 
