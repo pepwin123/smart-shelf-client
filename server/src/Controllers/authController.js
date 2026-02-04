@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import User from "../models/authModel.js";
+import User from "../Models/authModel.js";
 
 export const login = async (req, res) => {
   try {
@@ -26,7 +26,7 @@ export const login = async (req, res) => {
     return res.status(200).json({
       success: true,
       token,
-      user: { id: user._id, email: user.email },
+      user: { id: user._id, email: user.email, username: user.username },
       message: "User has successfully logged in"
     });
 

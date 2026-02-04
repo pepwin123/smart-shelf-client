@@ -4,6 +4,7 @@ import {
   createWorkspace,
   getWorkspaces,
   getWorkspace,
+  getWorkspaceCollaborators,
   updateCardPosition,
   addCard,
   deleteCard,
@@ -19,6 +20,8 @@ router.use(auth);
 router.post("/", createWorkspace);
 router.get("/", getWorkspaces);
 router.get("/:workspaceId", getWorkspace);
+// Return list of collaborators for a workspace
+router.get("/:workspaceId/collaborators", getWorkspaceCollaborators);
 router.delete("/:workspaceId", deleteWorkspace);
 
 // Card operations
