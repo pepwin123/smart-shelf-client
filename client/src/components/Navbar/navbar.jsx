@@ -41,7 +41,7 @@ export default function Header({setUser}) {
                 className="ml-auto flex items-center left-15 gap-3 relative cursor-pointer"
             >
                 <img src={profile} className="w-9 rounded-full" />
-                <p className="text-white font-bold">{username?.name}</p>
+                <p className="text-white font-bold">{username?.username || username?.email || "User"}</p>
                 <img
                     src={downarrow}
                     className="w-4 invert brightness-200"

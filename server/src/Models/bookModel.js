@@ -11,6 +11,7 @@ const bookSchema = new mongoose.Schema(
     authors: [String],
     firstPublishYear: Number,
     coverId: Number,
+    coverUrl: String,
     subjects: [String],
     availability: {
       readable: Boolean,
@@ -20,5 +21,5 @@ const bookSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Book = mongoose.model("Book", bookSchema);
+const Book = mongoose.models.Book || mongoose.model("Book", bookSchema);
 export default Book;

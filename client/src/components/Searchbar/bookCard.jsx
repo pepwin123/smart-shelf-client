@@ -1,7 +1,7 @@
-import { addBook, getCachedBook } from "../../api/shelfApi";
+import axios from "axios";
 import { useState } from "react";
 
-export default function BookCard({ book }) {
+export default function BookCard({ book, onBookAdded }) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAddShelf = async () => {
@@ -14,22 +14,29 @@ export default function BookCard({ book }) {
 
     setIsLoading(true);
     try {
-      // Fetch and cache book metadata from OpenLibrary
-      const cachedBook = await getCachedBook(book.key);
+      const token = localStorage.getItem("token");
+      
+      // Add book directly to workspace as a card in "to-read" column
+      const res = await axios.post(
+        `/api/workspaces/${workspaceId}/cards`,
+        {
+          columnId: "to-read",
+          bookId: book.key || `book-${Date.now()}`,
+          title: book.title || "Unknown Title",
+          author: book.author_name?.join(", ") || "Unknown Author",
+          cover: book.cover_i 
+            ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` 
+            : null,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-      // Extract relevant metadata
-      const metadata = cachedBook.data.book || {};
+      // Callback to parent (Home component) to refresh or parent handles emit
+      if (onBookAdded) {
+        onBookAdded(res.data.workspace);
+      }
 
-      await addBook({
-        workspaceId,
-        bookId: book._id,
-        title: metadata.title || book.title,
-        author: metadata.authors?.join(", ") || book.author_name?.join(", ") || "Unknown",
-        cover: metadata.coverUrl || (book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` : null),
-        metadata,
-      });
-
-      alert("Book added to Shelf!");
+      alert("✅ Book added to Shelf! Other users will see it instantly.");
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.message || "Failed to add book");
@@ -66,7 +73,7 @@ export default function BookCard({ book }) {
           isLoading ? "bg-gray-600 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
         }`}
       >
-        {isLoading ? "Adding..." : "Add to Shelf"}
+        {isLoading ? "Adding..." : "Add to Workspace"}
       </button>
     </div>
   );

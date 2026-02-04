@@ -129,6 +129,8 @@ export default function WorkspaceBoard({ workspaceId, socket }) {
 
     socket.on("workspace-updated", (updatedWorkspace) => {
       if (updatedWorkspace._id === workspaceId) {
+        console.log("📡 Real-time update received:", updatedWorkspace.name);
+        console.log("   Total cards:", updatedWorkspace.columns.reduce((sum, col) => sum + col.cards.length, 0));
         setWorkspace(updatedWorkspace);
       }
     });

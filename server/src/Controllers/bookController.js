@@ -77,6 +77,7 @@ export const saveBook = async (req, res, next) => {
       subject,
       has_fulltext,
       public_scan_b,
+      coverUrl,
     } = req.body;
 
     const book = await Book.create({
@@ -85,6 +86,7 @@ export const saveBook = async (req, res, next) => {
       authors: author_name,
       firstPublishYear: first_publish_year,
       coverId: cover_i,
+      coverUrl: coverUrl || null,
       subjects: subject,
       availability: {
         readable: has_fulltext,
