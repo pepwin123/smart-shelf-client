@@ -2,28 +2,32 @@ import Header from "../Navbar/navbar";
 import SearchBar from "../Searchbar/searchbar";
 import SearchResults from "../Searchbar/searchResults";
 import AddManualBook from "../AddManualBook/AddManualBook";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
 export default function Home({setUser}) {
     const [books, setBooks] = useState([]);
     const [showAddModal, setShowAddModal] = useState(false);
-    const [socket, setSocket] = useState(null);
+    const socketRef = useRef(null);
 
-    // Initialize Socket.IO connection
+    // Initialize Socket.IO connection using a ref to avoid sync setState in effect
     useEffect(() => {
-        const newSocket = io("http://localhost:5000");
-        setSocket(newSocket);
-        
-        return () => newSocket.disconnect();
+        const s = io("http://localhost:5000");
+        socketRef.current = s;
+
+        return () => {
+            s.disconnect();
+            socketRef.current = null;
+        };
     }, []);
 
     // Handle when a book is added to workspace
     const handleBookAdded = (workspace) => {
-        if (socket && workspace) {
+        const s = socketRef.current;
+        if (s && workspace) {
             const workspaceId = workspace._id;
             // Emit event so other users see real-time update
-            socket.emit("card-added", {
+            s.emit("card-added", {
                 workspaceId,
                 workspace,
                 message: `A book was added to "${workspace.name}"`,

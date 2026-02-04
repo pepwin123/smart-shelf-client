@@ -1,6 +1,6 @@
 import express from "express";
 import axios from "axios";
-import Book from "../models/bookModel.js";
+import Book from "../Models/bookModel.js";
 
 const router = express.Router();
 

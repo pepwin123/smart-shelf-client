@@ -1,5 +1,5 @@
 import axios from "axios";
-import Book from "../models/bookModel.js";
+import Book from "../Models/bookModel.js";
 
 export const searchBooks = async (req, res, next) => {
   try {
