@@ -44,32 +44,6 @@ export const setupSocket = (io) => {
       io.to(`workspace-${workspaceId}`).emit("workspace-updated", workspace);
     });
 
-    socket.on("user-searching", (data) => {
-      const { workspaceId, userId, username, query } = data;
-      io.to(`workspace-${workspaceId}`).emit("user-searching-update", {
-        userId,
-        username,
-        query,
-        timestamp: new Date(),
-      });
-    });
-
-    socket.on("user-searching-stopped", (data) => {
-      const { workspaceId, userId } = data;
-      io.to(`workspace-${workspaceId}`).emit("user-searching-stopped-update", {
-        userId,
-        timestamp: new Date(),
-      });
-    });
-
-    socket.on("activity-log", (data) => {
-      const { workspaceId, activity } = data;
-      io.to(`workspace-${workspaceId}`).emit("activity-added", {
-        ...activity,
-        timestamp: new Date(),
-      });
-    });
-
     socket.on("disconnect", () => {
       console.log("User disconnected:", socket.id);
     });

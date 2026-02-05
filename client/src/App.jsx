@@ -3,6 +3,7 @@ import LoginPage from "./components/Auth/login";
 import Home from "./components/Home/home";
 import Register from "./components/Auth/register";
 import Workspace from "./components/Workspace/Workspace";
+import Reader from "./components/Reader/Reader";
 
 import { useEffect, useState } from "react";
 import axios from "axios";
@@ -57,7 +58,10 @@ function App() {
           path="/workspace"
           element={user ? <Workspace user={user} setUser={setUser} /> : <Navigate to="/" />}
         />
-
+        <Route
+          path="/reader/:bookId"
+          element={user ? <Reader user={user} /> : <Navigate to="/" />}
+        />
       </Routes>
     </BrowserRouter>
   );

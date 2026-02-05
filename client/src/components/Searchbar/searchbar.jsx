@@ -9,6 +9,7 @@ export default function SearchBar({ onResults }) {
   const [year, setYear] = useState("");
   const [subject, setSubject] = useState("");
   const [availability, setAvailability] = useState("");
+  const [publicDomainOnly, setPublicDomainOnly] = useState(false);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -18,14 +19,19 @@ export default function SearchBar({ onResults }) {
       setLoading(true);
       setError("");
 
-      const res = await axios.get("http://localhost:5000/api/search", {
+      // Use different endpoint based on search type
+      const endpoint = publicDomainOnly 
+        ? "http://localhost:5000/api/search/public-domain"
+        : "http://localhost:5000/api/search";
+
+      const res = await axios.get(endpoint, {
         params: { q: query, year, subject, availability },
       });
 
-      onResults(res.data.books);
+      onResults(res.data.books, res.data.count);
     } catch {
       setError("Search failed");
-      onResults([]);
+      onResults([], 0);
     } finally {
       setLoading(false);
     }
@@ -54,30 +60,47 @@ export default function SearchBar({ onResults }) {
       </div>
 
       {/* Simple Filters Row */}
-      <div className="flex gap-2 flex-wrap mb-4">
-        <input
-          type="number"
-          placeholder="Year"
-          value={year}
-          onChange={(e) => setYear(e.target.value)}
-          className="p-2 rounded-lg bg-white text-gray-900 border border-gray-300 focus:border-blue-500 focus:outline-none w-28"
-        />
-        <input
-          type="text"
-          placeholder="Subject"
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          className="p-2 rounded-lg bg-white text-gray-900 border border-gray-300 focus:border-blue-500 focus:outline-none flex-1 min-w-40"
-        />
-        <select
-          value={availability}
-          onChange={(e) => setAvailability(e.target.value)}
-          className="p-2 rounded-lg bg-white text-gray-900 border border-gray-300 focus:border-blue-500 focus:outline-none w-40"
+      <div className="flex gap-2 flex-wrap mb-4 items-center">
+        <button
+          type="button"
+          onClick={() => setPublicDomainOnly(!publicDomainOnly)}
+          className={`px-3 py-2 rounded-lg font-medium transition ${
+            publicDomainOnly
+              ? "bg-green-600 text-white"
+              : "bg-gray-200 text-gray-900 hover:bg-gray-300"
+          }`}
+          title="Search only copyright-free public domain books"
         >
-          <option value="">Availability</option>
-          <option value="readable">Readable</option>
-          <option value="borrowable">Borrowable</option>
-        </select>
+          📖 {publicDomainOnly ? "Public Domain" : "All Books"}
+        </button>
+        
+        {!publicDomainOnly && (
+          <>
+            <input
+              type="number"
+              placeholder="Year"
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              className="p-2 rounded-lg bg-white text-gray-900 border border-gray-300 focus:border-blue-500 focus:outline-none w-28"
+            />
+            <input
+              type="text"
+              placeholder="Subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="p-2 rounded-lg bg-white text-gray-900 border border-gray-300 focus:border-blue-500 focus:outline-none flex-1 min-w-40"
+            />
+            <select
+              value={availability}
+              onChange={(e) => setAvailability(e.target.value)}
+              className="p-2 rounded-lg bg-white text-gray-900 border border-gray-300 focus:border-blue-500 focus:outline-none w-40"
+            >
+              <option value="">Availability</option>
+              <option value="readable">Readable</option>
+              <option value="borrowable">Borrowable</option>
+            </select>
+          </>
+        )}
       </div>
 
       {/* Status Messages */}

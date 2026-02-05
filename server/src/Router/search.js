@@ -8,12 +8,7 @@ router.get("/", async (req, res) => {
   try {
     const {
       q,
-      page = 1,
-      subject,
-      year,        // ✅ single year
-      yearFrom,
-      yearTo,
-      availability
+      page = 1
     } = req.query;
 
     if (!q) {
@@ -23,102 +18,71 @@ router.get("/", async (req, res) => {
       });
     }
 
-    const response = await axios.get(
-      "https://openlibrary.org/search.json",
-      {
-        params: {
-          q,
-          page,
-          limit: 20,
-          fields:
-            "key,title,author_name,first_publish_year,cover_i,subject,has_fulltext,public_scan_b"
-        }
-      }
-    );
+    let books = [];
 
-    let books = response.data.docs;
+    // Try Google Books API first
+    try {
+      const startIndex = (page - 1) * 20;
+      const response = await axios.get(
+        "https://www.googleapis.com/books/v1/volumes",
+        {
+          params: {
+            q,
+            startIndex,
+            maxResults: 20,
+            orderBy: "relevance"
+          }
+        }
+      );
+
+      if (response.data.items) {
+        books = response.data.items.map((item) => {
+          const volumeInfo = item.volumeInfo;
+          return {
+            id: item.id,
+            key: item.id,
+            title: volumeInfo.title,
+            author_name: volumeInfo.authors || [],
+            first_publish_year: volumeInfo.publishedDate ? new Date(volumeInfo.publishedDate).getFullYear() : null,
+            description: volumeInfo.description || "",
+            cover_url: volumeInfo.imageLinks?.medium || volumeInfo.imageLinks?.thumbnail || null,
+            pageCount: volumeInfo.pageCount || 0,
+            categories: volumeInfo.categories || [],
+            language: volumeInfo.language || "en",
+          };
+        });
+      }
+    } catch (error) {
+      console.error("Error searching Google Books API:", error.message);
+    }
 
     // Also search local saved/manual books and merge
     try {
-      // Build a simple query: search q in title or authors or subjects
       const dbQuery = {
         $or: [
           { title: { $regex: q, $options: "i" } },
           { authors: { $elemMatch: { $regex: q, $options: "i" } } },
-          { subjects: { $elemMatch: { $regex: q, $options: "i" } } },
         ],
       };
 
-      if (year) {
-        dbQuery.firstPublishYear = Number(year);
-      }
-
-      if (subject) {
-        dbQuery.subjects = { $elemMatch: { $regex: subject, $options: "i" } };
-      }
-
-      if (availability === "readable") {
-        dbQuery["availability.readable"] = true;
-      }
-      if (availability === "borrowable") {
-        dbQuery["availability.borrowable"] = true;
-      }
-
       const localBooks = await Book.find(dbQuery).limit(50).lean();
 
-      // Map localBooks to same shape as OpenLibrary docs
+      // Map localBooks to same shape as Google Books docs
       const mapped = localBooks.map((b) => ({
-        key: b.openLibraryId, // manual-<ts> or real OL id
+        id: b._id.toString(),
+        key: b.googleBooksId || b._id.toString(),
         title: b.title,
         author_name: b.authors || [],
         first_publish_year: b.firstPublishYear,
-        cover_i: b.coverId || null,
         cover_url: b.coverUrl || null,
-        subject: b.subjects || b.subject || [],
-        // availability compatible fields
-        has_fulltext: !!(b.availability && b.availability.readable),
-        public_scan_b: !!(b.availability && b.availability.borrowable),
+        description: b.description || "",
         _manual: true,
       }));
 
       // Append manual books after remote results
-      books = [...mapped, ...books];
+      books = [...books, ...mapped];
     } catch (err) {
       console.error("Error querying local books:", err);
-    }
-
-    /* 📅 YEAR FILTER */
-    books = books.filter(book => {
-      if (!book.first_publish_year) return false;
-
-      // ✅ SINGLE YEAR (your requirement)
-      if (year && book.first_publish_year !== Number(year)) {
-        return false;
-      }
-
-      // (optional) RANGE support if you ever use it later
-      if (yearFrom && book.first_publish_year < Number(yearFrom)) return false;
-      if (yearTo && book.first_publish_year > Number(yearTo)) return false;
-
-      return true;
-    });
-
-    /* 📘 SUBJECT FILTER */
-    if (subject) {
-      books = books.filter(book =>
-        book.subject?.some(s =>
-          s.toLowerCase().includes(subject.toLowerCase())
-        )
-      );
-    }
-
-    /* 📖 AVAILABILITY FILTER */
-    if (availability === "readable") {
-      books = books.filter(book => book.has_fulltext === true);
-    }
-
-    if (availability === "borrowable") {
-      books = books.filter(book => book.public_scan_b === true);
     }
 
     res.json({
@@ -128,9 +92,73 @@ router.get("/", async (req, res) => {
     });
 
   } catch (error) {
+    console.error("Search error:", error.message);
     res.status(500).json({
       success: false,
       message: "Search failed"
+    });
+  }
+});
+
+// Search public domain books from Project Gutenberg
+router.get("/public-domain", async (req, res) => {
+  try {
+    const { q, page = 1 } = req.query;
+
+    if (!q) {
+      return res.status(400).json({
+        success: false,
+        message: "Query required"
+      });
+    }
+
+    let books = [];
+
+    // Search Project Gutenberg API (Gutendex - free API wrapper)
+    try {
+      const response = await axios.get(
+        "https://gutendex.com/books",
+        {
+          params: {
+            search: q,
+          }
+        }
+      );
+
+      if (response.data.results) {
+        books = response.data.results.map((book) => {
+          return {
+            id: book.id,
+            key: `gutenberg-${book.id}`,
+            title: book.title,
+            author_name: book.authors?.map(a => a.name) || [],
+            first_publish_year: null,
+            cover_url: book.formats?.["image/jpeg"] || null,
+            description: `${book.title} by ${book.authors?.map(a => a.name).join(", ") || "Unknown"}`,
+            categories: book.subjects || [],
+            language: book.languages?.[0] || "en",
+            public_domain: true,
+            gutenberg_id: book.id,
+            cover_formats: book.formats,
+          };
+        });
+      }
+    } catch (error) {
+      console.error("Error searching Project Gutenberg:", error.message);
+    }
+
+    res.json({
+      success: true,
+      count: books.length,
+      books,
+      source: "Project Gutenberg (Public Domain)"
+    });
+
+  } catch (error) {
+    console.error("Public domain search error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Public domain search failed"
     });
   }
 });

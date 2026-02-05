@@ -4,7 +4,7 @@ export default function SearchResults({ books, onBookAdded }) {
   if (!books.length) return null;
 
   return (
-    <div className="mt-8 grid grid-cols-4 gap-6 max-w-3xl mx-auto">
+    <div className="mt-8 grid grid-cols-6 gap-6">
       {books.map((book) => (
         <BookCard key={book.key} book={book} onBookAdded={onBookAdded} />
       ))}

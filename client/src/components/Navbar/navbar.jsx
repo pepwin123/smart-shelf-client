@@ -27,13 +27,12 @@ export default function Header({setUser}) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
     return(
-        <nav className="bg-gray-800 shadow-lg flex items-center justify-around py-4 px-32 fixed top-0 left-0 w-full gap-15">
+        <nav className="bg-gray-800 shadow-lg flex items-center justify-around py-4 px-32 fixed top-0 left-0 w-full gap-15 z-50">
             <Link to='/home' className="text-white text-2xl font-semibold flex items-center">Smart Shelf</Link>
 
             <div className="flex items-center gap-5 text-black">
                 <Link to="/" className="py-1 px-3 text-lg font-light text-white rounded-xl hover:bg-slate-700 transition duration-300">Discovery Engine</Link>
                 <Link to="/workspace" className="py-1 px-3 text-lg font-light text-white rounded-xl hover:bg-slate-700 transition duration-300">Collabrative Workspace</Link>
-                <Link to="/" className="py-1 px-3 text-lg font-light text-white rounded-xl hover:bg-slate-700 transition duration-300">Research Notes</Link>
             </div>
 
             <div

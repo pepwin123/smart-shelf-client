@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 import WorkspaceBoard from "./WorkspaceBoard";
-import Collaborators from "./Collaborators";
 import Header from "../Navbar/navbar";
 
 export default function Workspace({ setUser }) {
@@ -27,7 +26,9 @@ export default function Workspace({ setUser }) {
       if (res.data.workspaces.length > 0 && !selectedWorkspaceId) {
         const firstId = res.data.workspaces[0]._id;
         setSelectedWorkspaceId(firstId);
-        try { localStorage.setItem('lastWorkspaceId', firstId); } catch(e) {}
+        try { localStorage.setItem('lastWorkspaceId', firstId); } catch(err) {
+          console.error('Failed to set localStorage:', err);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch workspaces:", error);
@@ -48,54 +49,14 @@ export default function Workspace({ setUser }) {
       setWorkspaces([...workspaces, res.data.workspace]);
       const newId = res.data.workspace._id;
       setSelectedWorkspaceId(newId);
-      try { localStorage.setItem('lastWorkspaceId', newId); } catch(e) {}
+      try { localStorage.setItem('lastWorkspaceId', newId); } catch(err) {
+        console.error('Failed to set localStorage:', err);
+      }
       setNewWorkspaceName("");
       setNewWorkspaceDesc("");
       setShowCreateForm(false);
     } catch (error) {
       console.error("Failed to create workspace:", error);
-    }
-  };
-
-  // Function to add book to workspace
-  const handleAddBookToShelf = async (book) => {
-    if (!selectedWorkspaceId) {
-      alert("Please select a workspace first");
-      return;
-    }
-
-    const bookTitle = book.title || "Unknown Title";
-    const bookAuthor = book.author_name
-      ? book.author_name.join(", ")
-      : "Unknown Author";
-
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.post(
-        `/api/workspaces/${selectedWorkspaceId}/cards`,
-        {
-          columnId: "to-read",
-          bookId: book.key || `book-${Date.now()}`,
-          title: bookTitle,
-          author: bookAuthor,
-          cover: book.cover_i
-            ? `https://covers.openlibrary.org/b/id/${book.cover_i}-S.jpg`
-            : null,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (socket) {
-        socket.emit("card-added", {
-          workspaceId: selectedWorkspaceId,
-          workspace: res.data.workspace,
-        });
-      }
-
-      alert("Book added to To Read!");
-    } catch (error) {
-      console.error("Failed to add book:", error);
-      alert("Failed to add book to shelf");
     }
   };
 
@@ -113,7 +74,8 @@ export default function Workspace({ setUser }) {
     // store previous id on the socket instance to track
     try {
       previous = socket.__currentWorkspaceId || null;
-    } catch (e) {
+    } catch (err) {
+      console.error('Failed to get workspace ID:', err);
       previous = null;
     }
 
@@ -165,10 +127,12 @@ export default function Workspace({ setUser }) {
               </label>
               <select
                 value={selectedWorkspaceId || ""}
-                onChange={(e) => {
-                  const val = e.target.value;
+                onChange={(event) => {
+                  const val = event.target.value;
                   setSelectedWorkspaceId(val);
-                  try { localStorage.setItem('lastWorkspaceId', val); } catch(e) {}
+                  try { localStorage.setItem('lastWorkspaceId', val); } catch(err) {
+                    console.error('Failed to set localStorage:', err);
+                  }
                 }}
                 className="w-full p-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none text-sm mb-3"
               >
@@ -185,11 +149,6 @@ export default function Workspace({ setUser }) {
               >
                 {showCreateForm ? "Cancel" : "+ New Workspace"}
               </button>
-            </div>
-
-            {/* Collaborators */}
-            <div className="flex-1 min-w-64">
-              <Collaborators workspaceId={selectedWorkspaceId} />
             </div>
           </div>
 
