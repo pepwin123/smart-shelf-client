@@ -12,6 +12,7 @@ const bookSchema = new mongoose.Schema(
     firstPublishYear: Number,
     coverId: Number,
     coverUrl: String,
+    contentUrl: String,
     subjects: [String],
     availability: {
       readable: Boolean,

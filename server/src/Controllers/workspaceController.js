@@ -16,7 +16,6 @@ export const createWorkspace = async (req, res) => {
       name,
       description,
       owner: userId,
-      collaborators: [userId],
       columns,
     });
 
@@ -65,7 +64,7 @@ export const getWorkspace = async (req, res) => {
     const userId = req.user._id.toString();
 
     const workspace = await Workspace.findById(workspaceId).populate(
-      "owner collaborators",
+      "owner",
       "email username"
     );
 
@@ -76,14 +75,10 @@ export const getWorkspace = async (req, res) => {
       });
     }
 
-    // Check if user is owner or collaborator
+    // Check if user is owner
     const ownerId = workspace.owner._id.toString();
-    const collaboratorIds = workspace.collaborators.map(c => c._id.toString());
     
-    const isAuthorized = ownerId === userId || collaboratorIds.includes(userId);
-
-    if (!isAuthorized) {
-      console.log(`Authorization failed: userId=${userId}, ownerId=${ownerId}, collaborators=${collaboratorIds.join(", ")}`);
+    if (ownerId !== userId) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to access this workspace",
@@ -324,51 +319,6 @@ export const deleteWorkspace = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to delete workspace",
-      error: error.message,
-    });
-  }
-};
-
-// Get collaborators for a workspace
-export const getWorkspaceCollaborators = async (req, res) => {
-  try {
-    const { workspaceId } = req.params;
-    const userId = req.user._id.toString();
-
-    const workspace = await Workspace.findById(workspaceId).populate(
-      "owner collaborators",
-      "email username"
-    );
-
-    if (!workspace) {
-      return res.status(404).json({
-        success: false,
-        message: "Workspace not found",
-      });
-    }
-
-    // Only owner or existing collaborators can view collaborators
-    const ownerId = workspace.owner._id.toString();
-    const collaboratorIds = workspace.collaborators.map((c) => c._id.toString());
-
-    const isAuthorized = ownerId === userId || collaboratorIds.includes(userId);
-
-    if (!isAuthorized) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to view collaborators for this workspace",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      collaborators: workspace.collaborators,
-    });
-  } catch (error) {
-    console.error("GET WORKSPACE COLLABORATORS ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch collaborators",
       error: error.message,
     });
   }

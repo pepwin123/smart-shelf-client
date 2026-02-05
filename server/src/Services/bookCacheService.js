@@ -1,76 +1,62 @@
 import axios from "axios";
 import BookCache from "../Models/bookCacheModel.js";
 
-// Fetch from OpenLibrary and cache
-export const fetchAndCacheBook = async (openLibraryKey) => {
+// Fetch from Google Books API and cache
+export const fetchAndCacheBook = async (googleBooksId) => {
   try {
-    // Normalize the key - extract just the ID if it includes /works/ or /books/ prefix
-    const normalizedKey = openLibraryKey.includes('/') 
-      ? openLibraryKey.split('/').pop() 
-      : openLibraryKey;
+    // Normalize the ID
+    const normalizedId = googleBooksId;
     
-    // Build the full path for the API call
-    const apiPath = openLibraryKey.includes('/') 
-      ? openLibraryKey 
-      : `/works/${normalizedKey}`;
-
-    // Check cache first using normalized key
-    const existing = await BookCache.findOne({ openLibraryKey: normalizedKey });
+    // Check cache first
+    const existing = await BookCache.findOne({ googleBooksId: normalizedId });
     if (existing) {
       await existing.incrementHit();
-      console.log(`Cache HIT for ${normalizedKey}`);
+      console.log(`Cache HIT for ${normalizedId}`);
       return existing;
     }
 
-    // Fetch from OpenLibrary
+    // Fetch from Google Books API
     const response = await axios.get(
-      `https://openlibrary.org${apiPath}.json`
+      `https://www.googleapis.com/books/v1/volumes/${googleBooksId}`
     );
 
-    const bookData = response.data;
+    const volumeInfo = response.data.volumeInfo;
 
     // Extract and structure data
     const cacheData = {
-      openLibraryKey: normalizedKey,
-      title: bookData.title,
-      authors: bookData.authors?.map((a) => a.name) || [],
-      isbn: bookData.isbn || [],
-      isbn10: bookData.isbn_10 || [],
-      isbn13: bookData.isbn_13 || [],
-      firstPublishYear: bookData.first_publish_year,
-      publishYear: bookData.publish_year,
-      pages: bookData.number_of_pages,
-      coverId: bookData.covers?.[0],
-      coverUrl: bookData.covers?.[0]
-        ? `https://covers.openlibrary.org/b/id/${bookData.covers[0]}-M.jpg`
-        : null,
-      subjects: bookData.subjects || [],
-      genres: bookData.genres || [],
-      description: bookData.description?.value || bookData.description || "",
-      languages: bookData.languages?.map((l) => l.key) || [],
-      publisherName: bookData.publishers || [],
-      editionCount: bookData.edition_count,
+      googleBooksId: normalizedId,
+      title: volumeInfo.title,
+      authors: volumeInfo.authors || [],
+      isbn: volumeInfo.industryIdentifiers?.map(id => id.identifier) || [],
+      firstPublishYear: volumeInfo.publishedDate ? new Date(volumeInfo.publishedDate).getFullYear() : null,
+      publishYear: volumeInfo.publishedDate ? new Date(volumeInfo.publishedDate).getFullYear() : null,
+      pages: volumeInfo.pageCount,
+      coverUrl: volumeInfo.imageLinks?.medium || volumeInfo.imageLinks?.thumbnail || null,
+      subjects: volumeInfo.categories || [],
+      genres: volumeInfo.categories || [],
+      description: volumeInfo.description || "",
+      languages: [volumeInfo.language || "en"],
+      publisherName: volumeInfo.publisher ? [volumeInfo.publisher] : [],
+      editionCount: 1,
     };
 
     // Cache it
     const created = await BookCache.create(cacheData);
-    console.log(`Cache MISS - Fetched and cached ${normalizedKey}`);
+    console.log(`Cache MISS - Fetched and cached ${normalizedId}`);
     return created;
   } catch (error) {
-    console.error(`Error fetching book ${openLibraryKey}:`, error.message);
+    console.error(`Error fetching book ${googleBooksId}:`, error.message);
     throw error;
   }
 };
 
 // Get book from cache with availability
-export const getBookFromCache = async (openLibraryKey) => {
+export const getBookFromCache = async (googleBooksId) => {
   try {
-    // Normalize the key
-    const normalizedKey = openLibraryKey.includes('/') 
-      ? openLibraryKey.split('/').pop() 
-      : openLibraryKey;
+    // Normalize the ID
+    const normalizedId = googleBooksId;
       
-    const book = await BookCache.findOne({ openLibraryKey: normalizedKey });
+    const book = await BookCache.findOne({ googleBooksId: normalizedId });
     if (book) {
       await book.incrementHit();
     }

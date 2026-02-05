@@ -11,10 +11,9 @@ import database from "./src/Config/MongoConnection.js";
 import authRouter from "./src/Router/authRouter.js";
 import bookRoutes from "./src/Router/books.js";
 import searchRoutes from "./src/Router/search.js";
-import shelfRouter from "./src/Router/shelfRoutes.js";
 import workspaceRouter from "./src/Router/workspaceRouter.js";
 import bookCacheRouter from "./src/Router/bookCacheRouter.js";
-import activityLogRouter from "./src/Router/activityLogRouter.js";
+import researchNotesRouter from "./src/Router/researchNotes.js";
 
 import errorHandler from "./src/Middleware/errorMiddleware.js";
 import { setupSocket } from "./src/Config/socket.js";
@@ -33,6 +32,8 @@ database();
 
 app.use(express.json());
 app.use(cors());
+// Serve uploaded files (PDFs)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const io = new Server(server, {
   cors: { origin: "*" },
@@ -50,9 +51,8 @@ app.use("/api/users", authRouter);
 app.use("/api/search", searchRoutes);  
 app.use("/api/books", bookRoutes);
 app.use("/api/books-cache", bookCacheRouter);
-app.use("/api/shelves", shelfRouter);
-app.use("/api/activity", activityLogRouter);
 app.use("/api/workspaces", workspaceRouter);
+app.use("/api/notes", researchNotesRouter);
 app.use(errorHandler);
 
 server.listen(PORT, () => {

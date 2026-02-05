@@ -14,10 +14,12 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import axios from "axios";
-import { Trash2 } from "lucide-react";
+import { Trash2, Eye } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 // Draggable Card Component
 function DraggableCard({ id, card, columnId, onDelete }) {
+  const navigate = useNavigate();
   const {
     attributes,
     listeners,
@@ -31,6 +33,19 @@ function DraggableCard({ id, card, columnId, onDelete }) {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+  };
+
+  const handleViewBook = (e) => {
+    e.stopPropagation();
+    // Encode bookId to handle slashes in Open Library keys
+    const encodedBookId = encodeURIComponent(card.bookId);
+    console.log("Opening reader with bookId:", card.bookId, "encoded:", encodedBookId);
+    navigate(`/reader/${encodedBookId}`, {
+      state: {
+        title: card.title,
+        author: card.author,
+      },
+    });
   };
 
   return (
@@ -52,13 +67,22 @@ function DraggableCard({ id, card, columnId, onDelete }) {
             </p>
           )}
         </div>
-        <button
-          onClick={() => onDelete(columnId, card.id)}
-          className="text-gray-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100"
-          title="Delete card"
-        >
-          <Trash2 size={16} />
-        </button>
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+          <button
+            onClick={handleViewBook}
+            className="p-1 text-gray-400 hover:text-blue-400 rounded transition"
+            title="Read book"
+          >
+            <Eye size={16} />
+          </button>
+          <button
+            onClick={() => onDelete(columnId, card.id)}
+            className="p-1 text-gray-400 hover:text-red-500 rounded transition"
+            title="Delete card"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );
