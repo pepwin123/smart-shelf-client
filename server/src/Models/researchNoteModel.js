@@ -1,10 +1,11 @@
 import mongoose from "mongoose";
 
 const researchNoteSchema = new mongoose.Schema({
-  openLibraryKey: {
+  googleBooksVolumeId: {
     type: String,
     required: true,
     index: true,
+    description: "Google Books volume ID associated with this note",
   },
   workspaceId: {
     type: mongoose.Schema.Types.ObjectId,

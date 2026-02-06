@@ -3,12 +3,12 @@ import ResearchNote from "../Models/researchNoteModel.js";
 // Create a new research note
 export const createNote = async (req, res) => {
   try {
-    const { openLibraryKey, workspaceId, chapterId, pageNumber, content, tags } = req.body;
+    const { googleBooksVolumeId, workspaceId, chapterId, pageNumber, content, tags } = req.body;
     const userId = req.user._id;
     const username = req.user.username;
 
     const note = await ResearchNote.create({
-      openLibraryKey,
+      googleBooksVolumeId,
       workspaceId,
       userId,
       username,
@@ -44,13 +44,13 @@ export const createNote = async (req, res) => {
 // Get notes for a specific book
 export const getNotesByBook = async (req, res) => {
   try {
-    let { openLibraryKey } = req.params;
+    let { googleBooksVolumeId } = req.params;
     // Decode in case it's URL encoded
-    openLibraryKey = decodeURIComponent(openLibraryKey);
+    googleBooksVolumeId = decodeURIComponent(googleBooksVolumeId);
     
-    console.log("Fetching notes for openLibraryKey:", openLibraryKey);
+    console.log("Fetching notes for googleBooksVolumeId:", googleBooksVolumeId);
 
-    const notes = await ResearchNote.find({ openLibraryKey })
+    const notes = await ResearchNote.find({ googleBooksVolumeId })
       .populate("userId", "username email")
       .populate("collaborators", "username email")
       .sort({ createdAt: -1 });
