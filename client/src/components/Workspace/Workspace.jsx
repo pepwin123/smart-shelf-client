@@ -116,13 +116,13 @@ export default function Workspace({ setUser }) {
   return (
     <div>
       <Header setUser={setUser} />
-      <div className="pt-20 min-h-screen bg-gray-900 p-4">
+      <div className="pt-16 sm:pt-20 min-h-screen bg-gray-900 p-3 sm:p-4 md:p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Top Controls - Horizontal Layout */}
-          <div className="flex gap-4 mb-6 flex-wrap">
+          {/* Top Controls - Responsive Layout */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
             {/* Select Workspace + Create Button */}
-            <div className="bg-gray-800 rounded-lg p-4 flex-1 min-w-64">
-              <label className="block text-white text-sm font-medium mb-2">
+            <div className="bg-gray-800 rounded-lg p-3 sm:p-4 flex-1">
+              <label className="block text-white text-xs sm:text-sm font-medium mb-2">
                 Select Workspace
               </label>
               <select
@@ -134,7 +134,7 @@ export default function Workspace({ setUser }) {
                     console.error('Failed to set localStorage:', err);
                   }
                 }}
-                className="w-full p-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none text-sm mb-3"
+                className="w-full p-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none text-xs sm:text-sm mb-3"
               >
                 <option value="">Choose a workspace...</option>
                 {workspaces.map((ws) => (
@@ -145,7 +145,7 @@ export default function Workspace({ setUser }) {
               </select>
               <button
                 onClick={() => setShowCreateForm(!showCreateForm)}
-                className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-medium text-sm transition"
+                className="w-full bg-green-500 hover:bg-green-600 text-white px-3 sm:px-4 py-2 rounded font-medium text-xs sm:text-sm transition"
               >
                 {showCreateForm ? "Cancel" : "+ New Workspace"}
               </button>
@@ -154,14 +154,14 @@ export default function Workspace({ setUser }) {
 
           {/* Create Workspace Form - Below if shown */}
           {showCreateForm && (
-            <div className="bg-gray-800 rounded-lg p-4 mb-6 max-w-md">
+            <div className="bg-gray-800 rounded-lg p-3 sm:p-4 mb-6 w-full sm:max-w-md">
               <form onSubmit={handleCreateWorkspace} className="space-y-2">
                 <input
                   type="text"
                   placeholder="Workspace name"
                   value={newWorkspaceName}
                   onChange={(e) => setNewWorkspaceName(e.target.value)}
-                  className="w-full p-2 bg-gray-700 text-white rounded text-sm border border-gray-600 focus:border-blue-500 outline-none"
+                  className="w-full p-2 bg-gray-700 text-white rounded text-xs sm:text-sm border border-gray-600 focus:border-blue-500 outline-none"
                   required
                 />
                 <input
@@ -169,11 +169,11 @@ export default function Workspace({ setUser }) {
                   placeholder="Description (optional)"
                   value={newWorkspaceDesc}
                   onChange={(e) => setNewWorkspaceDesc(e.target.value)}
-                  className="w-full p-2 bg-gray-700 text-white rounded text-sm border border-gray-600 focus:border-blue-500 outline-none"
+                  className="w-full p-2 bg-gray-700 text-white rounded text-xs sm:text-sm border border-gray-600 focus:border-blue-500 outline-none"
                 />
                 <button
                   type="submit"
-                  className="w-full bg-blue-500 hover:bg-blue-600 text-white p-2 rounded font-medium text-sm transition"
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white p-2 rounded font-medium text-xs sm:text-sm transition"
                 >
                   Create
                 </button>
@@ -185,8 +185,8 @@ export default function Workspace({ setUser }) {
           {selectedWorkspaceId ? (
             <WorkspaceBoard workspaceId={selectedWorkspaceId} socket={socket} />
           ) : (
-            <div className="bg-gray-800 rounded-lg p-8 text-center">
-              <p className="text-gray-400">Select a workspace to begin</p>
+            <div className="bg-gray-800 rounded-lg p-6 sm:p-8 text-center">
+              <p className="text-gray-400 text-sm sm:text-base">Select a workspace to begin</p>
             </div>
           )}
         </div>

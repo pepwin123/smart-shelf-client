@@ -4,8 +4,19 @@ import Book from "../Models/bookModel.js";
 
 const router = express.Router();
 
+// Simple in-memory cache for search results (key -> { expires, data })
+const searchCache = new Map();
+const SEARCH_CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
+
+function sleep(ms) {
+  return new Promise((res) => setTimeout(res, ms));
+}
+
 router.get("/", async (req, res) => {
   try {
+    // Read API key dynamically from environment (not at module load time)
+    const GOOGLE_API_KEY = process.env.GOOGLE_BOOKS_API_KEY || "";
+    
     const {
       q,
       page = 1
@@ -20,37 +31,81 @@ router.get("/", async (req, res) => {
 
     let books = [];
 
-    // Try Google Books API first
+    // Try Google Books API first (with simple caching and retry on 429)
     try {
       const startIndex = (page - 1) * 20;
-      const response = await axios.get(
-        "https://www.googleapis.com/books/v1/volumes",
-        {
-          params: {
-            q,
-            startIndex,
-            maxResults: 20,
-            orderBy: "relevance"
+      const cacheKey = `search:${q}:${page}`;
+
+      // Return cached result if present and not expired
+      const cached = searchCache.get(cacheKey);
+      if (cached && cached.expires > Date.now()) {
+        books = cached.data;
+      } else {
+        const url = "https://www.googleapis.com/books/v1/volumes";
+        let response = null;
+        let attempt = 0;
+        const maxAttempts = 3;
+
+        while (attempt < maxAttempts) {
+          try {
+            const params = {
+              q,
+              startIndex,
+              maxResults: 20,
+              orderBy: "relevance",
+              ...(GOOGLE_API_KEY ? { key: GOOGLE_API_KEY } : {}),
+            };
+            console.log(`   📡 Requesting: ${url}?q=${q}&key=${GOOGLE_API_KEY ? 'SET' : 'MISSING'}`);
+            response = await axios.get(url, { params });
+            break; // success
+          } catch (err) {
+            const status = err.response?.status;
+            const errorData = err.response?.data;
+            console.error(`   ❌ Attempt ${attempt + 1}: ${status} - ${err.message}`);
+            if (errorData) console.error(`      Error details: ${JSON.stringify(errorData)}`);
+            
+            if (status === 429) {
+              // Rate limited: exponential backoff
+              const backoff = 500 * Math.pow(2, attempt);
+              console.warn(`   🔄 Rate-limited, backing off ${backoff}ms`);
+              const retryAfter = err.response?.headers?.['retry-after'];
+              if (retryAfter) {
+                await sleep(parseInt(retryAfter, 10) * 1000);
+              } else {
+                await sleep(backoff);
+              }
+              attempt += 1;
+              continue;
+            }
+            // For other errors (401, 403, etc), break and allow local fallback
+            console.error(`   🛑 Not retrying for status ${status} — using local fallback`);
+            break;
           }
         }
-      );
 
-      if (response.data.items) {
-        books = response.data.items.map((item) => {
-          const volumeInfo = item.volumeInfo;
-          return {
-            id: item.id,
-            key: item.id,
-            title: volumeInfo.title,
-            author_name: volumeInfo.authors || [],
-            first_publish_year: volumeInfo.publishedDate ? new Date(volumeInfo.publishedDate).getFullYear() : null,
-            description: volumeInfo.description || "",
-            cover_url: volumeInfo.imageLinks?.medium || volumeInfo.imageLinks?.thumbnail || null,
-            pageCount: volumeInfo.pageCount || 0,
-            categories: volumeInfo.categories || [],
-            language: volumeInfo.language || "en",
-          };
-        });
+        if (response && response.data && response.data.items) {
+          books = response.data.items.map((item) => {
+            const volumeInfo = item.volumeInfo;
+            return {
+              id: item.id,
+              key: item.id,
+              title: volumeInfo.title,
+              author_name: volumeInfo.authors || [],
+              first_publish_year: volumeInfo.publishedDate ? new Date(volumeInfo.publishedDate).getFullYear() : null,
+              description: volumeInfo.description || "",
+              cover_url: volumeInfo.imageLinks?.medium || volumeInfo.imageLinks?.thumbnail || null,
+              pageCount: volumeInfo.pageCount || 0,
+              categories: volumeInfo.categories || [],
+              language: volumeInfo.language || "en",
+            };
+          });
+
+          // cache the search results
+          searchCache.set(cacheKey, {
+            expires: Date.now() + SEARCH_CACHE_TTL_MS,
+            data: books,
+          });
+        }
       }
     } catch (error) {
       console.error("Error searching Google Books API:", error.message);
@@ -82,9 +137,10 @@ router.get("/", async (req, res) => {
       // Append manual books after remote results
       books = [...books, ...mapped];
     } catch (err) {
-      console.error("Error querying local books:", err);
+      console.error("❌ Local books query error:", err.message);
     }
 
+    console.log(`📤 Returning ${books.length} total books`);
     res.json({
       success: true,
       count: books.length,

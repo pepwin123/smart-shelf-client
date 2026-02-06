@@ -311,18 +311,20 @@ export default function WorkspaceBoard({ workspaceId, socket }) {
       ) : workspace ? (
         <div>
           {/* Workspace Title and Description */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-white mb-2">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 truncate">
               {workspace.name}
             </h1>
-            <p className="text-gray-400">
-              {workspace.description || "No description"}
-            </p>
+            {workspace.description && (
+              <p className="text-gray-400 text-xs sm:text-sm truncate">
+                {workspace.description}
+              </p>
+            )}
           </div>
 
           {/* Debug info */}
-          <div className="mb-4 text-xs text-gray-400">
-            Workspace ID: {workspace._id} | Columns: {workspace.columns?.length || 0}
+          <div className="mb-3 sm:mb-4 text-xs text-gray-400 overflow-x-auto">
+            <span>Workspace ID: {workspace._id}</span> | <span>Columns: {workspace.columns?.length || 0}</span>
           </div>
 
           {/* Kanban Board with Drag & Drop */}
@@ -338,13 +340,13 @@ export default function WorkspaceBoard({ workspaceId, socket }) {
               )}
               strategy={verticalListSortingStrategy}
             >
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                 {workspace.columns.map((column) => (
-                  <div key={column.id} className="bg-gray-800 rounded-lg p-4 flex flex-col">
-                    <div className="mb-4">
-                      <h3 className="text-white font-bold text-lg">{column.title}</h3>
-                      <p className="text-gray-400 text-sm">
-                        {column.cards.length} cards
+                  <div key={column.id} className="bg-gray-800 rounded-lg p-3 sm:p-4 flex flex-col">
+                    <div className="mb-3 sm:mb-4">
+                      <h3 className="text-white font-bold text-base sm:text-lg truncate">{column.title}</h3>
+                      <p className="text-gray-400 text-xs sm:text-sm">
+                        {column.cards.length} {column.cards.length === 1 ? 'card' : 'cards'}
                       </p>
                     </div>
 
@@ -352,7 +354,7 @@ export default function WorkspaceBoard({ workspaceId, socket }) {
                       {column.cards.length === 0 ? (
                         <ColumnDropZone columnId={column.id} />
                       ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-2 sm:space-y-3">
                           {column.cards.map((card, idx) => (
                             <DraggableCard
                               key={card.id}
@@ -367,13 +369,13 @@ export default function WorkspaceBoard({ workspaceId, socket }) {
                     </div>
 
                     {openColumnId === column.id ? (
-                      <div className="mt-4 space-y-2">
+                      <div className="mt-3 sm:mt-4 space-y-2">
                         <input
                           type="text"
                           placeholder="Book title"
                           value={cardTitle}
                           onChange={(e) => setCardTitle(e.target.value)}
-                          className="w-full p-2 bg-gray-700 text-white rounded text-sm border border-gray-600 focus:border-blue-500 outline-none"
+                          className="w-full p-2 bg-gray-700 text-white rounded text-xs sm:text-sm border border-gray-600 focus:border-blue-500 outline-none"
                           autoFocus
                         />
                         <input
@@ -381,18 +383,18 @@ export default function WorkspaceBoard({ workspaceId, socket }) {
                           placeholder="Author (optional)"
                           value={cardAuthor}
                           onChange={(e) => setCardAuthor(e.target.value)}
-                          className="w-full p-2 bg-gray-700 text-white rounded text-sm border border-gray-600 focus:border-blue-500 outline-none"
+                          className="w-full p-2 bg-gray-700 text-white rounded text-xs sm:text-sm border border-gray-600 focus:border-blue-500 outline-none"
                         />
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleAddCard(column.id)}
-                            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded font-medium text-sm transition"
+                            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded font-medium text-xs sm:text-sm transition"
                           >
                             Add
                           </button>
                           <button
                             onClick={() => setOpenColumnId(null)}
-                            className="flex-1 bg-gray-600 hover:bg-gray-700 text-white p-2 rounded font-medium text-sm transition"
+                            className="flex-1 bg-gray-600 hover:bg-gray-700 text-white p-2 rounded font-medium text-xs sm:text-sm transition"
                           >
                             Cancel
                           </button>
@@ -401,7 +403,7 @@ export default function WorkspaceBoard({ workspaceId, socket }) {
                     ) : (
                       <button
                         onClick={() => setOpenColumnId(column.id)}
-                        className="w-full mt-4 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white p-2 rounded font-medium text-sm transition"
+                        className="w-full mt-3 sm:mt-4 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white p-2 rounded font-medium text-xs sm:text-sm transition"
                       >
                         + Add Card
                       </button>

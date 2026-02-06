@@ -63,10 +63,9 @@ export const getWorkspace = async (req, res) => {
     const { workspaceId } = req.params;
     const userId = req.user._id.toString();
 
-    const workspace = await Workspace.findById(workspaceId).populate(
-      "owner",
-      "email username"
-    );
+    const workspace = await Workspace.findById(workspaceId)
+      .populate("owner", "email username")
+      .populate("collaborators", "email username");
 
     if (!workspace) {
       return res.status(404).json({
@@ -75,10 +74,13 @@ export const getWorkspace = async (req, res) => {
       });
     }
 
-    // Check if user is owner
+    // Check if user is owner or collaborator
     const ownerId = workspace.owner._id.toString();
+    const isCollaborator = workspace.collaborators.some(
+      (c) => c._id.toString() === userId
+    );
     
-    if (ownerId !== userId) {
+    if (ownerId !== userId && !isCollaborator) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to access this workspace",
