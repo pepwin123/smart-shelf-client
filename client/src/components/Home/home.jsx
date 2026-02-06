@@ -23,15 +23,17 @@ export default function Home({setUser}) {
             try {
                 const queries = ["fiction", "science", "history", "technology", "adventure"];
                 const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+                console.log(`🏠 Home: fetching for "${randomQuery}"`);
                 
                 const res = await axios.get("http://localhost:5000/api/search", {
                     params: { q: randomQuery, page: currentPage }
                 });
                 
+                console.log(`📚 Home received: ${res.data.books?.length || 0} books`);
                 setBooks(res.data.books || []);
                 setTotalResults(res.data.count || 0);
             } catch (error) {
-                console.error("Failed to fetch random books:", error);
+                console.error("❌ Home fetch error:", error.response?.data || error.message);
             } finally {
                 setLoading(false);
             }

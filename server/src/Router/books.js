@@ -7,11 +7,9 @@ import {
   saveBook,
   getSavedBooks,
   getWorkMetadata,
-  getEditionMetadata,
   getISBNMetadata,
   uploadBookFile,
   uploadCoverImage,
-  getReadableLinks,
 } from "../controllers/bookController.js";
 
 const router = express.Router();
@@ -59,10 +57,8 @@ router.get("/search", searchBooks);
 router.post("/books", saveBook);
 router.post("/upload", upload.single("file"), uploadBookFile);
 router.post("/upload-cover", uploadImage.single("file"), uploadCoverImage);
-router.get("/readable", getReadableLinks);
 router.get("/books", getSavedBooks);
 router.get("/work/:workId", getWorkMetadata);
-router.get("/edition/:bookKey", getEditionMetadata);
 router.get("/isbn/:isbn", getISBNMetadata);
 
 export default router;

@@ -18,10 +18,3 @@ export const moveBook = (id, data) =>
 
 export const addBook = (data) =>
   API.post("/shelves", data);
-
-// Get cached book metadata from backend
-export const getCachedBook = (openLibraryKey) => {
-  // Extract just the key ID if it includes /works/ or /books/ prefix
-  const keyId = openLibraryKey.split('/').pop();
-  return API.get(`/books-cache/${keyId}`);
-};

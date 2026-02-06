@@ -7,6 +7,7 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
   const [showForm, setShowForm] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [chapterId, setChapterId] = useState("");
+  const [pageNumber, setPageNumber] = useState(currentPage);
   const [tags, setTags] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedNote, setSelectedNote] = useState(null);
@@ -24,9 +25,9 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
       const res = await axios.post(
         "/api/notes",
         {
-          openLibraryKey: bookId,
+          googleBooksVolumeId: bookId,
           chapterId: chapterId || `chapter-${Math.random()}`,
-          pageNumber: currentPage,
+          pageNumber: parseInt(pageNumber) || 1,
           content: newNoteContent,
           tags: tags
             ? tags.split(",").map((tag) => tag.trim())
@@ -38,6 +39,7 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
       onNoteAdded(res.data.note);
       setNewNoteContent("");
       setChapterId("");
+      setPageNumber(currentPage);
       setTags("");
       setShowForm(false);
       alert("✅ Note created successfully!");
@@ -80,9 +82,9 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
   };
 
   return (
-    <div className="w-80 bg-gray-800 border-l border-gray-700 flex flex-col h-screen">
+    <div className="bg-gray-800 border-l border-gray-700 flex flex-col h-full w-full">
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-700 p-4 flex items-center justify-between">
+      <div className="bg-gray-900 border-b border-gray-700 p-4 flex items-center justify-between shrink-0">
         <h2 className="text-lg font-bold text-white">Research Notes</h2>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -95,7 +97,7 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
 
       {/* Add Note Form */}
       {showForm && (
-        <div className="border-b border-gray-700 p-4 space-y-3 bg-gray-750">
+        <div className="border-b border-gray-700 p-4 space-y-3 bg-gray-750 shrink-0 overflow-y-auto max-h-80">
           <form onSubmit={handleCreateNote} className="space-y-3">
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1">
@@ -112,10 +114,18 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
 
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1">
-                Page: {currentPage}
+                Page
               </label>
-              <p className="text-xs text-gray-400">
-                This note will be attached to page {currentPage}
+              <input
+                type="number"
+                min="1"
+                value={pageNumber}
+                onChange={(e) => setPageNumber(e.target.value)}
+                placeholder="Enter page number"
+                className="w-full px-3 py-2 bg-gray-700 text-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                This note will be attached to page {pageNumber || '—'}
               </p>
             </div>
 
@@ -127,7 +137,7 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
                 value={newNoteContent}
                 onChange={(e) => setNewNoteContent(e.target.value)}
                 placeholder="Write your note in markdown..."
-                rows="6"
+                rows="4"
                 className="w-full px-3 py-2 bg-gray-700 text-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
               />
             </div>
@@ -189,11 +199,11 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
               {/* Note Header */}
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-blue-400">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-blue-400 truncate">
                       {note.chapterId || "General"}
                     </span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
                       Page {note.pageNumber}
                     </span>
                   </div>
@@ -202,7 +212,7 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
                   </p>
                 </div>
 
-                <div className="flex gap-1">
+                <div className="flex gap-1 shrink-0 ml-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

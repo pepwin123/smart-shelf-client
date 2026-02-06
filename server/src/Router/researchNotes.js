@@ -10,7 +10,7 @@ import {
 const router = express.Router();
 
 // Public GET endpoint
-router.get("/book/:openLibraryKey", getNotesByBook);
+router.get("/book/:googleBooksVolumeId", getNotesByBook);
 
 // Protected endpoints (require authentication)
 router.use(auth);

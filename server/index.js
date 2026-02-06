@@ -14,6 +14,7 @@ import searchRoutes from "./src/Router/search.js";
 import workspaceRouter from "./src/Router/workspaceRouter.js";
 import bookCacheRouter from "./src/Router/bookCacheRouter.js";
 import researchNotesRouter from "./src/Router/researchNotes.js";
+import googleBooksRouter from "./src/Router/googleBooks.js";
 
 import errorHandler from "./src/Middleware/errorMiddleware.js";
 import { setupSocket } from "./src/Config/socket.js";
@@ -22,6 +23,10 @@ import { setupSocket } from "./src/Config/socket.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, ".env") });
+
+console.log(`\n🚀 Server startup:`);
+console.log(`   PORT: ${process.env.PORT || 5000}`);
+console.log(`   GOOGLE_BOOKS_API_KEY: ${process.env.GOOGLE_BOOKS_API_KEY ? '✅ SET' : '❌ NOT SET'}\n`);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,6 +55,7 @@ app.use((req, res, next) => {
 app.use("/api/users", authRouter);
 app.use("/api/search", searchRoutes);  
 app.use("/api/books", bookRoutes);
+app.use("/api/google-books", googleBooksRouter);
 app.use("/api/books-cache", bookCacheRouter);
 app.use("/api/workspaces", workspaceRouter);
 app.use("/api/notes", researchNotesRouter);
