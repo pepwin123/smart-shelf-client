@@ -21,6 +21,7 @@ export const searchBooks = async (req, res, next) => {
           startIndex,
           maxResults: 50,
           orderBy: "relevance",
+          key: process.env.GOOGLE_BOOKS_API_KEY || "",
         },
       }
     );
@@ -28,7 +29,7 @@ export const searchBooks = async (req, res, next) => {
     let books = (response.data.items || []).map((item) => ({
       key: item.id,
       id: item.id,
-      title: item.volumeInfo.title,
+      title: item.volumeInfo.title || "Unknown Title",
       author_name: item.volumeInfo.authors || [],
       first_publish_year: item.volumeInfo.publishedDate ? new Date(item.volumeInfo.publishedDate).getFullYear() : null,
       cover_url: item.volumeInfo.imageLinks?.medium || item.volumeInfo.imageLinks?.thumbnail || null,
@@ -36,18 +37,22 @@ export const searchBooks = async (req, res, next) => {
       has_fulltext: !!item.volumeInfo.previewLink,
       description: item.volumeInfo.description || "",
       pages: item.volumeInfo.pageCount || 0,
+      previewLink: item.volumeInfo.previewLink || null,
+      isbns: item.volumeInfo.industryIdentifiers?.map(id => id.identifier) || [],
     })) || [];
 
-    // Google Books API already returns results ranked by relevance
-    // Filter to only books that have titles and useful data
+    // ✅ DATA VALIDATION - Only include books with essential data
     books = books.filter((book) => {
-      return book.title && (book.cover_url || book.has_fulltext);
+      // Must have title
+      if (!book.title || book.title === "Unknown Title") return false;
+      // Must have at least one author
+      if (!book.author_name || book.author_name.length === 0) return false;
+      // Must have cover image OR preview link
+      if (!book.cover_url && !book.has_fulltext) return false;
+      return true;
     });
 
-    // Limit to top 10 results
-    books = books.slice(0, 10);
-
-    /* 📅 YEAR FILTER */
+    // 📅 YEAR FILTER
     if (year) {
       const y = Number(year);
       books = books.filter(
@@ -57,7 +62,7 @@ export const searchBooks = async (req, res, next) => {
       );
     }
 
-    /* 📘 SUBJECT FILTER */
+    // 📘 SUBJECT FILTER
     if (subject) {
       books = books.filter((book) =>
         book.subject?.some((s) =>
@@ -66,14 +71,13 @@ export const searchBooks = async (req, res, next) => {
       );
     }
 
-    /* 📖 AVAILABILITY FILTER */
+    // 📖 AVAILABILITY FILTER
     if (availability === "readable") {
       books = books.filter((book) => book.has_fulltext === true);
     }
 
-    if (availability === "borrowable") {
-      books = books.filter((book) => book.public_scan_b === true);
-    }
+    // Limit to top 10 results
+    books = books.slice(0, 10);
 
     res.json({
       success: true,
@@ -103,7 +107,7 @@ export const saveBook = async (req, res, next) => {
     } = req.body;
 
     const book = await Book.create({
-      googleBooksId: id || key,
+      googleBooksVolumeId: id || key,
       title,
       authors: author_name,
       firstPublishYear: first_publish_year,
@@ -114,7 +118,7 @@ export const saveBook = async (req, res, next) => {
         readable: has_fulltext,
       },
       description: description || "",
-      pages: pages || 0,
+      pageCount: pages || 0,
     });
 
     res.status(201).json({
@@ -143,14 +147,19 @@ export const getSavedBooks = async (req, res, next) => {
   }
 };
 
-/* 📖 GET BOOK WORK METADATA */
+/* 📖 GET BOOK WORK METADATA (Google Books) */
 export const getWorkMetadata = async (req, res, next) => {
   try {
     const { workId } = req.params;
     
     // Fetch book details from Google Books API
     const response = await axios.get(
-      `https://www.googleapis.com/books/v1/volumes/${workId}`
+      `https://www.googleapis.com/books/v1/volumes/${workId}`,
+      {
+        params: {
+          key: process.env.GOOGLE_BOOKS_API_KEY || "",
+        },
+      }
     );
     
     const volumeInfo = response.data.volumeInfo;
@@ -178,61 +187,7 @@ export const getWorkMetadata = async (req, res, next) => {
   }
 };
 
-
-/* 📕 GET BOOK EDITION METADATA */
-export const getEditionMetadata = async (req, res, next) => {
-  try {
-    const { bookKey } = req.params;
-    const response = await axios.get(
-      `https://openlibrary.org/books/${bookKey}.json`
-    );
-    
-    const data = response.data;
-    
-    // Handle description - can be string or object with value property
-    let description = "";
-    if (typeof data.description === "string") {
-      description = data.description;
-    } else if (data.description?.value) {
-      description = data.description.value;
-    }
-
-    // Extract ISBN, LCCN, OCLC
-    let isbn = null;
-    let lccn = null;
-    let oclc = null;
-    
-    if (data.isbn_10?.[0]) {
-      isbn = data.isbn_10[0];
-    } else if (data.isbn_13?.[0]) {
-      isbn = data.isbn_13[0];
-    }
-    
-    if (data.lccn?.[0]) {
-      lccn = data.lccn[0];
-    }
-    
-    if (data.oclc?.[0]) {
-      oclc = data.oclc[0];
-    }
-
-    res.json({
-      title: data.title,
-      author: data.authors?.[0]?.name,
-      description: description || "No description available",
-      number_of_pages: data.number_of_pages,
-      cover_url: data.covers?.[0] ? `https://covers.openlibrary.org/b/id/${data.covers[0]}-M.jpg` : null,
-      isbns: isbn ? [isbn] : [],
-      lccn: lccn,
-      oclc: oclc,
-    });
-  } catch (error) {
-    console.error("Error fetching edition metadata:", error.message);
-    next(error);
-  }
-};
-
-/* 📌 GET BOOK METADATA BY ISBN */
+/* 📌 GET BOOK METADATA BY ISBN (Google Books) */
 export const getISBNMetadata = async (req, res, next) => {
   try {
     const { isbn } = req.params;
@@ -242,6 +197,7 @@ export const getISBNMetadata = async (req, res, next) => {
         params: {
           q: `isbn:${isbn}`,
           maxResults: 1,
+          key: process.env.GOOGLE_BOOKS_API_KEY || "",
         },
       }
     );
@@ -266,84 +222,6 @@ export const getISBNMetadata = async (req, res, next) => {
   } catch (error) {
     console.error("Error fetching ISBN metadata:", error.message);
     next(error);
-  }
-};
-
-/* 📖 GET READABLE LINKS FROM OPEN LIBRARY READ API */
-export const getReadableLinks = async (req, res, next) => {
-  try {
-    const { isbn, lccn, oclc, olid } = req.query;
-
-    // Build the request based on provided identifier
-    let url;
-    let idType;
-    let idValue;
-
-    if (isbn) {
-      idType = "isbn";
-      idValue = isbn;
-    } else if (lccn) {
-      idType = "lccn";
-      idValue = lccn;
-    } else if (oclc) {
-      idType = "oclc";
-      idValue = oclc;
-    } else if (olid) {
-      idType = "olid";
-      idValue = olid;
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "At least one identifier (isbn, lccn, oclc, olid) is required",
-      });
-    }
-
-    url = `https://openlibrary.org/api/volumes/brief/${idType}/${idValue}.json`;
-
-    console.log(`📖 Fetching Read API for ${idType}:${idValue} from ${url}`);
-
-    const response = await axios.get(url);
-    const data = response.data;
-
-    // Extract the most useful info from the Read API response
-    const items = data.items || [];
-    const records = data.records || {};
-
-    // Sort items: prefer 'exact' matches and 'full access' status
-    items.sort((a, b) => {
-      const matchScore = (a.match === "exact" ? 1 : 0) - (b.match === "exact" ? 1 : 0);
-      if (matchScore !== 0) return -matchScore; // higher first
-
-      const statusOrder = { "full access": 3, "lendable": 2, "checked out": 1, "restricted": 0 };
-      const aStatus = statusOrder[a.status] || 0;
-      const bStatus = statusOrder[b.status] || 0;
-      return bStatus - aStatus;
-    });
-
-    // Return the best match with a clean response
-    const bestItem = items?.[0];
-    const allItems = items;
-
-    res.json({
-      success: true,
-      bestMatch: {
-        title: "Book found",
-        authors: [],
-        previewLink: null,
-        hasPreview: false,
-      },
-      allMatches: [],
-      note: "Use Google Books API for book previews",
-    });
-  } catch (error) {
-    console.error("Error fetching readable links:", error.message);
-    // Return gracefully if no match found
-    res.json({
-      success: false,
-      bestMatch: null,
-      allMatches: [],
-      note: "Could not fetch readable links from Google Books",
-    });
   }
 };
 

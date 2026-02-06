@@ -17,25 +17,8 @@ export default function BookCard({ book, onBookAdded }) {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      // Use ISBN if available, otherwise use the Open Library key without slashes
-      let bookId;
-      if (book.isbn?.[0]) {
-        bookId = book.isbn[0];
-      } else if (book.key) {
-        // Ensure key starts with / before replacing slashes
-        const key = book.key.startsWith("/") ? book.key : `/${book.key}`;
-        bookId = key.replace(/\//g, "-");
-      } else {
-        bookId = `book-${Date.now()}`;
-      }
-
-      // Determine cover URL - prioritize Google Books, then Open Library, then null
-      let coverUrl = null;
-      if (book.cover_url) {
-        coverUrl = book.cover_url;
-      } else if (book.cover_i) {
-        coverUrl = `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`;
-      }
+      // Use Google Books volume ID (always available from API response)
+      const bookId = book.id || book.key;
 
       await axios.post(
         `/api/workspaces/${workspaceId}/cards`,
@@ -44,7 +27,7 @@ export default function BookCard({ book, onBookAdded }) {
           bookId: bookId,
           title: book.title || "Unknown",
           author: book.author_name?.join(", ") || "Unknown",
-          cover: coverUrl,
+          cover: book.cover_url || null,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -59,64 +42,60 @@ export default function BookCard({ book, onBookAdded }) {
   };
 
   const handleReadBook = () => {
-    let bookId;
-    if (book.isbn?.[0]) {
-      bookId = book.isbn[0];
-    } else if (book.key) {
-      // Ensure key starts with / before replacing slashes
-      const key = book.key.startsWith("/") ? book.key : `/${book.key}`;
-      bookId = key.replace(/\//g, "-");
-    } else {
-      bookId = `book-${Date.now()}`;
-    }
+    // Use Google Books volume ID
+    const bookId = book.id || book.key;
     const encodedBookId = encodeURIComponent(bookId);
     navigate(`/reader/${encodedBookId}`, {
       state: {
         title: book.title,
         author: book.author_name?.join(", "),
+        previewLink: book.previewLink,
+        cover_url: book.cover_url,
+        description: book.description,
+        pages: book.pages,
+        isbns: book.isbns,
       },
     });
   };
 
   return (
-    <div className="bg-slate-800 text-white p-4 rounded-lg relative">
-      {book.public_domain && (
-        <div className="absolute top-2 right-2 bg-green-600 px-2 py-1 rounded text-xs font-bold">
-          ✅ FREE
-        </div>
-      )}
-      <h3 className="text-lg font-semibold">{book.title}</h3>
-      <p className="text-sm text-gray-300">by {book.author_name?.join(", ") || "Unknown"}</p>
-      <p className="text-xs text-gray-400">{book.first_publish_year || "N/A"}</p>
+    <div className="bg-slate-800 text-white rounded-lg relative flex flex-col h-full shadow-lg hover:shadow-xl transition-shadow">
+      <div className="flex-1 p-3 sm:p-4">
+        <h3 className="text-base sm:text-lg font-semibold line-clamp-2">{book.title}</h3>
+        <p className="text-xs sm:text-sm text-gray-300 line-clamp-1">by {book.author_name?.join(", ") || "Unknown"}</p>
+        <p className="text-xs text-gray-400">{book.first_publish_year || "N/A"}</p>
 
-      {(book.cover_url || book.cover_i) && (
-        <img
-          className="mt-2 w-24 rounded"
-          src={book.cover_url || `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`}
-          alt={book.title}
-          onError={(e) => {
-            e.target.style.display = "none";
-          }}
-        />
-      )}
+        {book.cover_url && (
+          <img
+            className="mt-2 sm:mt-3 w-20 sm:w-24 rounded object-cover"
+            src={book.cover_url}
+            alt={book.title}
+            onError={(e) => {
+              e.target.style.display = "none";
+            }}
+          />
+        )}
+      </div>
 
-      <div className="flex gap-2 mt-3">
+      <div className="flex gap-1 sm:gap-2 p-2 sm:p-3 pt-2 sm:pt-3 border-t border-slate-700">
         <button
           onClick={handleReadBook}
           title="Read book"
-          className="flex-1 px-3 py-1 rounded text-sm bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-1"
+          className="flex-1 px-2 sm:px-3 py-1 rounded text-xs sm:text-sm bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-1 transition-colors"
         >
-          <Eye size={16} />
-          Read
+          <Eye size={14} className="sm:w-4 sm:h-4" />
+          <span className="hidden sm:inline">Read</span>
+          <span className="sm:hidden">📖</span>
         </button>
         <button
           onClick={handleAddShelf}
           disabled={isLoading}
-          className={`flex-1 px-3 py-1 rounded text-sm ${
+          className={`flex-1 px-2 sm:px-3 py-1 rounded text-xs sm:text-sm transition-colors ${
             isLoading ? "bg-gray-600" : "bg-blue-600 hover:bg-blue-700"
           } text-white`}
         >
-          {isLoading ? "Adding..." : "Add to Workspace"}
+          <span className="hidden sm:inline">{isLoading ? "Adding..." : "Add to Workspace"}</span>
+          <span className="sm:hidden">{isLoading ? "..." : "+"}</span>
         </button>
       </div>
     </div>

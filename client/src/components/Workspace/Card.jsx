@@ -25,22 +25,22 @@ export default function Card({ id, card, onDelete }) {
       style={style}
       {...attributes}
       {...listeners}
-      className={`bg-gray-600 p-3 rounded shadow-lg hover:shadow-xl transition cursor-grab active:cursor-grabbing group ${
+      className={`bg-gray-600 p-3 rounded shadow-lg hover:shadow-xl transition cursor-grab active:cursor-grabbing group flex flex-col ${
         isDragging ? "ring-2 ring-blue-500" : ""
       }`}
     >
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-white font-medium truncate text-sm">
-            {card.title}
-          </p>
-          {card.author && (
-            <p className="text-gray-300 text-xs truncate">{card.author}</p>
-          )}
-        </div>
+      <div className="flex-1 mb-2">
+        <p className="text-white font-medium truncate text-sm">
+          {card.title}
+        </p>
+        {card.author && (
+          <p className="text-gray-300 text-xs truncate">{card.author}</p>
+        )}
+      </div>
+      <div className="flex justify-end items-center gap-2 pt-2 border-t border-gray-500">
         <button
           onClick={onDelete}
-          className="text-gray-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100 shrink-0"
+          className="text-gray-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100 shrink-0 p-1"
           title="Delete card"
         >
           <Trash2 size={16} />

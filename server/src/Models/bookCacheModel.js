@@ -2,41 +2,34 @@ import mongoose from "mongoose";
 
 const bookCacheSchema = new mongoose.Schema(
   {
-    openLibraryKey: {
+    googleBooksVolumeId: {
       type: String,
       required: true,
       unique: true,
       index: true,
+      description: "Google Books volume ID (e.g., zyTCAlFPjgYC)",
     },
     title: String,
     authors: [String],
-    isbn: [String],
-    isbn10: [String],
-    isbn13: [String],
-    firstPublishYear: Number,
+    isbn10: String,
+    isbn13: String,
+    publishedDate: String,
     publishYear: Number,
-    pages: Number,
-    coverId: Number,
-    coverUrl: String, // Pre-built URL for quick access
+    pageCount: Number,
+    coverUrl: String,
     subjects: [String],
-    genres: [String],
     description: String,
-    ratings: {
-      average: Number,
-      count: Number,
+    language: String,
+    publisher: String,
+    ratingsAverage: Number,
+    ratingsCount: Number,
+    accessInfo: {
+      viewability: String,
+      embeddable: Boolean,
+      publicDomain: Boolean,
     },
-    availability: {
-      readable: Boolean,
-      borrowable: Boolean,
-      fullText: Boolean,
-    },
-    languages: [String],
-    publisherName: [String],
-    editionCount: Number,
-    firstEdition: {
-      year: Number,
-      title: String,
-    },
+    previewLink: String,
+    infoLink: String,
     // Metadata for tracking
     cacheHits: {
       type: Number,
@@ -71,15 +64,15 @@ bookCacheSchema.methods.refreshExpiration = function () {
 };
 
 // Static method to find or create
-bookCacheSchema.statics.findOrCreate = async function (openLibraryKey, data) {
-  let book = await this.findOne({ openLibraryKey });
+bookCacheSchema.statics.findOrCreate = async function (googleBooksVolumeId, data) {
+  let book = await this.findOne({ googleBooksVolumeId });
 
   if (book) {
     await book.incrementHit();
     await book.refreshExpiration();
   } else {
     book = await this.create({
-      openLibraryKey,
+      googleBooksVolumeId,
       ...data,
       cacheHits: 1,
     });

@@ -8,11 +8,11 @@ export default function AddManualBook({ isOpen, onClose }) {
   const [authors, setAuthors] = useState("");
   const [year, setYear] = useState("");
   const [subjects, setSubjects] = useState("");
+  const [description, setDescription] = useState("");
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState("");
   const [pdfFile, setPdfFile] = useState(null);
   const [pdfName, setPdfName] = useState("");
-  const [availability, setAvailability] = useState("");
   const [loading, setLoading] = useState(false);
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
   const [pendingAddToWorkspace, setPendingAddToWorkspace] = useState(null);
@@ -24,11 +24,11 @@ export default function AddManualBook({ isOpen, onClose }) {
     setAuthors("");
     setYear("");
     setSubjects("");
+    setDescription("");
     setCoverFile(null);
     setCoverPreview("");
     setPdfFile(null);
     setPdfName("");
-    setAvailability("");
   };
 
   const handleCoverFileChange = (e) => {
@@ -85,16 +85,20 @@ export default function AddManualBook({ isOpen, onClose }) {
         uploadedPdfUrl = uploadRes.data.url;
       }
 
+      // Generate a unique ID for manual books
+      const manualBookId = `manual-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
       const payload = {
-        key: `manual-${Date.now()}`,
+        id: manualBookId,
+        key: manualBookId,
         title,
         author_name: authors ? authors.split(",").map(a => a.trim()) : [],
-        first_publish_year: year ? Number(year) : undefined,
-        cover_i: null,
+        first_publish_year: year ? Number(year) : null,
         subject: subjects ? subjects.split(",").map(s => s.trim()) : [],
-        has_fulltext: availability === "readable",
-        public_scan_b: availability === "borrowable",
-        coverUrl: uploadedCoverUrl || null,
+        has_fulltext: !!uploadedPdfUrl,
+        description: description || "",
+        pages: 0,
+        cover_url: uploadedCoverUrl || null,
         contentUrl: uploadedPdfUrl || null,
       };
 
@@ -146,10 +150,10 @@ export default function AddManualBook({ isOpen, onClose }) {
         `/api/workspaces/${workspaceId}/cards`,
         {
           columnId: "to-read",
-          bookId: book.openLibraryId || book._id || book.key || `book-${Date.now()}`,
+          bookId: book.googleBooksVolumeId || book._id || book.key || `book-${Date.now()}`,
           title: book.title,
           author: (book.authors || book.author_name || []).join(", "),
-          cover: book.coverUrl || null,
+          cover: book.coverUrl || book.cover_url || null,
           metadata: book,
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -177,7 +181,7 @@ export default function AddManualBook({ isOpen, onClose }) {
 
           <form onSubmit={handleSubmit} className="space-y-3 max-h-96 overflow-y-auto">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Title</label>
+              <label className="block text-sm font-medium text-gray-700">Title *</label>
               <input required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-2 border rounded" />
             </div>
 
@@ -186,23 +190,20 @@ export default function AddManualBook({ isOpen, onClose }) {
               <input value={authors} onChange={(e) => setAuthors(e.target.value)} className="w-full p-2 border rounded" />
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Year</label>
-                <input value={year} onChange={(e) => setYear(e.target.value)} className="w-full p-2 border rounded" />
+                <label className="block text-sm font-medium text-gray-700">Publication Year</label>
+                <input type="number" value={year} onChange={(e) => setYear(e.target.value)} className="w-full p-2 border rounded" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Subjects (comma)</label>
                 <input value={subjects} onChange={(e) => setSubjects(e.target.value)} className="w-full p-2 border rounded" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Availability</label>
-                <select value={availability} onChange={(e) => setAvailability(e.target.value)} className="w-full p-2 border rounded">
-                  <option value="">None</option>
-                  <option value="readable">Readable</option>
-                  <option value="borrowable">Borrowable</option>
-                </select>
-              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-2 border rounded h-20 resize-none" />
             </div>
 
             <div>
