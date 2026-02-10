@@ -20,6 +20,7 @@ router.get("/", async (req, res) => {
     const {
       q,
       page = 1,
+      perPage = 20,
       year,
       category,
       availability
@@ -51,8 +52,10 @@ router.get("/", async (req, res) => {
     // Try Google Books API first (with simple caching and retry on 429) - only if we have a query
     if (q) {
       try {
-        const startIndex = (page - 1) * 20;
-        const cacheKey = `search:${q}:${page}`;
+        const perPageInt = Math.min(Math.max(parseInt(perPage, 10) || 20, 1), 40);
+        const pageInt = Math.max(parseInt(page, 10) || 1, 1);
+        const startIndex = (pageInt - 1) * perPageInt;
+        const cacheKey = `search:${q}:${pageInt}:perPage:${perPageInt}`;
 
         // Return cached result if present and not expired
         const cached = searchCache.get(cacheKey);
@@ -69,7 +72,7 @@ router.get("/", async (req, res) => {
               const params = {
                 q,
                 startIndex,
-                maxResults: 20,
+                maxResults: perPageInt,
                 orderBy: "relevance",
                 ...(GOOGLE_API_KEY ? { key: GOOGLE_API_KEY } : {}),
               };
@@ -168,7 +171,8 @@ router.get("/", async (req, res) => {
         dbQuery.contentUrl = { $exists: true, $ne: null };
       }
 
-      const localBooks = await Book.find(dbQuery).limit(50).lean();
+      const perPageIntForLocal = Math.min(Math.max(parseInt(perPage, 10) || 20, 1), 100);
+      const localBooks = await Book.find(dbQuery).limit(perPageIntForLocal).lean();
 
       // Map localBooks to same shape as Google Books docs
       const mapped = localBooks.map((b) => ({

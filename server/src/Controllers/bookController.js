@@ -11,7 +11,7 @@ const uploadsDir = path.join(__dirname, "../../uploads");
 
 export const searchBooks = async (req, res, next) => {
   try {
-    const { q, page = 1, subject, year, availability } = req.query;
+    const { q, page = 1, perPage = 20, subject, year, availability } = req.query;
 
     if (!q) {
       return res.status(400).json({
@@ -20,19 +20,20 @@ export const searchBooks = async (req, res, next) => {
       });
     }
 
-    const startIndex = (page - 1) * 50;
-    const response = await axios.get(
-      "https://www.googleapis.com/books/v1/volumes",
-      {
-        params: {
-          q,
-          startIndex,
-          maxResults: 50,
-          orderBy: "relevance",
-          key: process.env.GOOGLE_BOOKS_API_KEY || "",
-        },
-      }
-    );
+    // sanitize perPage and page
+    const perPageInt = Math.min(Math.max(parseInt(perPage, 10) || 20, 1), 40);
+    const pageInt = Math.max(parseInt(page, 10) || 1, 1);
+    const startIndex = (pageInt - 1) * perPageInt;
+
+    const response = await axios.get("https://www.googleapis.com/books/v1/volumes", {
+      params: {
+        q,
+        startIndex,
+        maxResults: perPageInt,
+        orderBy: "relevance",
+        key: process.env.GOOGLE_BOOKS_API_KEY || "",
+      },
+    });
 
     let books = (response.data.items || []).map((item) => ({
       key: item.id,
@@ -84,8 +85,7 @@ export const searchBooks = async (req, res, next) => {
       books = books.filter((book) => book.has_fulltext === true);
     }
 
-    // Limit to top 10 results
-    books = books.slice(0, 10);
+    // Do not apply a static backend limit here; frontend pagination controls results.
 
     res.json({
       success: true,

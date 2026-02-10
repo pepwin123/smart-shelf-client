@@ -3,7 +3,7 @@ import Book from "../Models/bookModel.js";
 
 export const searchBooks = async (req, res, next) => {
   try {
-    const { q, page = 1, subject, year, availability } = req.query;
+    const { q, page = 1, perPage = 10, subject, year, availability } = req.query;
 
     if (!q) {
       return res.status(400).json({
@@ -12,18 +12,17 @@ export const searchBooks = async (req, res, next) => {
       });
     }
 
-    const startIndex = (page - 1) * 10;
-    const response = await axios.get(
-      "https://www.googleapis.com/books/v1/volumes",
-      {
-        params: {
-          q,
-          startIndex,
-          maxResults: 10,
-          orderBy: "relevance",
-        },
-      }
-    );
+    const perPageInt = Math.min(Math.max(parseInt(perPage, 10) || 10, 1), 40);
+    const pageInt = Math.max(parseInt(page, 10) || 1, 1);
+    const startIndex = (pageInt - 1) * perPageInt;
+    const response = await axios.get("https://www.googleapis.com/books/v1/volumes", {
+      params: {
+        q,
+        startIndex,
+        maxResults: perPageInt,
+        orderBy: "relevance",
+      },
+    });
 
     let books = (response.data.items || []).map((item) => ({
       key: item.id,
