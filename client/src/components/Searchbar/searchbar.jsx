@@ -7,29 +7,42 @@ export default function SearchBar({ onResults }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [year, setYear] = useState("");
-  const [subject, setSubject] = useState("");
+  const [category, setCategory] = useState("");
   const [availability, setAvailability] = useState("");
 
-  const performSearch = async (searchQuery, searchYear, searchSubject, searchAvailability) => {
-    if (!searchQuery.trim()) return;
-
+  const performSearch = async (searchQuery, searchYear, searchCategory, searchAvailability) => {
     try {
       setLoading(true);
       setError("");
 
-      const params = {
-        q: searchQuery,
-        ...(searchYear && { year: searchYear }),
-        ...(searchSubject && { subject: searchSubject }),
-        ...(searchAvailability && { availability: searchAvailability }),
-      };
+      // Build query - allow empty query if filters are present
+      const params = {};
+      
+      if (searchQuery?.trim()) {
+        params.q = searchQuery;
+      }
+      if (searchYear) {
+        params.year = searchYear;
+      }
+      if (searchCategory) {
+        params.category = searchCategory;
+      }
+      if (searchAvailability) {
+        params.availability = searchAvailability;
+      }
+
+      // Require at least a query or filters
+      if (Object.keys(params).length === 0) {
+        onResults([], 0);
+        return;
+      }
 
       const res = await axios.get("/api/search", { params });
-
-      onResults(res.data.books, res.data.count);
-    } catch {
+      onResults(res.data.books || [], res.data.count || 0);
+    } catch (err) {
       setError("Search failed. Please try again.");
       onResults([], 0);
+      console.error("Search error:", err);
     } finally {
       setLoading(false);
     }
@@ -37,28 +50,30 @@ export default function SearchBar({ onResults }) {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    performSearch(query, year, subject, availability);
+    performSearch(query, year, category, availability);
   };
 
   const handleYearChange = (e) => {
     const newYear = e.target.value;
     setYear(newYear);
-    // Trigger search with current query and new year filter
-    performSearch(query, newYear, subject, availability);
+    // Only trigger search if year is empty or a valid 4-digit year
+    if (!newYear || (newYear.length === 4 && !isNaN(newYear))) {
+      performSearch(query, newYear, category, availability);
+    }
   };
 
-  const handleSubjectChange = (e) => {
-    const newSubject = e.target.value;
-    setSubject(newSubject);
-    // Trigger search with current query and new subject filter
-    performSearch(query, year, newSubject, availability);
+  const handleCategoryChange = (e) => {
+    const newCategory = e.target.value;
+    setCategory(newCategory);
+    // Trigger search with current query and new category filter
+    performSearch(query, year, newCategory, availability);
   };
 
   const handleAvailabilityChange = (e) => {
     const newAvailability = e.target.value;
     setAvailability(newAvailability);
     // Trigger search with current query and new availability filter
-    performSearch(query, year, subject, newAvailability);
+    performSearch(query, year, category, newAvailability);
   };
 
   const handleQueryChange = (e) => {
@@ -66,16 +81,16 @@ export default function SearchBar({ onResults }) {
     setQuery(newQuery);
     // Trigger search with new query and current filters
     if (newQuery.trim()) {
-      performSearch(newQuery, year, subject, availability);
+      performSearch(newQuery, year, category, availability);
     }
   };
 
   const clearFilters = () => {
     setYear("");
-    setSubject("");
+    setCategory("");
     setAvailability("");
-    // Search with cleared filters
-    performSearch(query, "", "", "");
+    setQuery("");
+    onResults([], 0);
   };
 
   return (
@@ -109,13 +124,36 @@ export default function SearchBar({ onResults }) {
           onChange={handleYearChange}
           className="p-2 rounded-lg bg-white text-gray-900 border border-gray-300 focus:border-blue-500 focus:outline-none w-24"
         />
-        <input
-          type="text"
-          placeholder="Category"
-          value={subject}
-          onChange={handleSubjectChange}
+        <select
+          value={category}
+          onChange={handleCategoryChange}
           className="p-2 rounded-lg bg-white text-gray-900 border border-gray-300 focus:border-blue-500 focus:outline-none flex-1 min-w-40"
-        />
+        >
+          <option value="">Select Category</option>
+          <option value="fiction">Fiction</option>
+          <option value="mystery">Mystery</option>
+          <option value="science fiction">Science Fiction</option>
+          <option value="fantasy">Fantasy</option>
+          <option value="romance">Romance</option>
+          <option value="thriller">Thriller</option>
+          <option value="biography">Biography</option>
+          <option value="history">History</option>
+          <option value="science">Science</option>
+          <option value="technology">Technology</option>
+          <option value="business">Business</option>
+          <option value="self-help">Self-Help</option>
+          <option value="poetry">Poetry</option>
+          <option value="drama">Drama</option>
+          <option value="adventure">Adventure</option>
+          <option value="horror">Horror</option>
+          <option value="education">Education</option>
+          <option value="philosophy">Philosophy</option>
+          <option value="art">Art</option>
+          <option value="cooking">Cooking</option>
+          <option value="travel">Travel</option>
+          <option value="sports">Sports</option>
+          <option value="psychology">Psychology</option>
+        </select>
         <select
           value={availability}
           onChange={handleAvailabilityChange}
@@ -124,7 +162,7 @@ export default function SearchBar({ onResults }) {
           <option value="">Availability</option>
           <option value="readable">Has Preview</option>
         </select>
-        {(year || subject || availability) && (
+        {(year || category || availability) && (
           <button
             type="button"
             onClick={clearFilters}

@@ -44,6 +44,10 @@ function DraggableCard({ id, card, columnId, onDelete }) {
       state: {
         title: card.title,
         author: card.author,
+        previewLink: card.previewLink || null,
+        contentUrl: card.previewLink || null,
+        extractedContent: card.extractedContent || null,
+        cover_url: card.cover || null,
       },
     });
   };
@@ -400,14 +404,7 @@ export default function WorkspaceBoard({ workspaceId, socket }) {
                           </button>
                         </div>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => setOpenColumnId(column.id)}
-                        className="w-full mt-3 sm:mt-4 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white p-2 rounded font-medium text-xs sm:text-sm transition"
-                      >
-                        + Add Card
-                      </button>
-                    )}
+                    ) : null}
                   </div>
                 ))}
               </div>

@@ -40,7 +40,7 @@ export const getWorkspaces = async (req, res) => {
     const userId = req.user._id;
 
     const workspaces = await Workspace.find({
-      $or: [{ owner: userId }, { collaborators: userId }],
+      owner: userId,
     }).populate("owner", "email username");
 
     return res.status(200).json({
@@ -64,8 +64,7 @@ export const getWorkspace = async (req, res) => {
     const userId = req.user._id.toString();
 
     const workspace = await Workspace.findById(workspaceId)
-      .populate("owner", "email username")
-      .populate("collaborators", "email username");
+      .populate("owner", "email username");
 
     if (!workspace) {
       return res.status(404).json({
@@ -74,13 +73,10 @@ export const getWorkspace = async (req, res) => {
       });
     }
 
-    // Check if user is owner or collaborator
+    // Check if user is owner
     const ownerId = workspace.owner._id.toString();
-    const isCollaborator = workspace.collaborators.some(
-      (c) => c._id.toString() === userId
-    );
     
-    if (ownerId !== userId && !isCollaborator) {
+    if (ownerId !== userId) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to access this workspace",
@@ -188,7 +184,7 @@ export const updateCardPosition = async (req, res) => {
 export const addCard = async (req, res) => {
   try {
     const { workspaceId } = req.params;
-    const { columnId, bookId, title, author, cover } = req.body;
+    const { columnId, bookId, title, author, cover, previewLink, extractedContent } = req.body;
 
     const workspace = await Workspace.findById(workspaceId);
 
@@ -208,12 +204,45 @@ export const addCard = async (req, res) => {
       });
     }
 
+    // If client passed a MongoDB _id as bookId (24 hex chars), try to resolve
+    // it to the Book.googleBooksVolumeId so reader routes use the correct identifier.
+    let bookIdToStore = bookId;
+    try {
+      if (typeof bookId === "string" && /^[0-9a-fA-F]{24}$/.test(bookId)) {
+        // Lazy import Book model to avoid circular deps
+        const Book = (await import("../Models/bookModel.js")).default;
+        const found = await Book.findById(bookId).lean();
+        if (found) {
+          bookIdToStore = found.googleBooksVolumeId || found._id.toString();
+        }
+      }
+    } catch (resolveErr) {
+      console.warn("Could not resolve bookId to googleBooksVolumeId:", resolveErr.message || resolveErr);
+      // fall back to original bookId
+      bookIdToStore = bookId;
+    }
+
+    // Prevent adding duplicate book cards to the workspace (any column)
+    const isAlreadyPresent = workspace.columns.some((col) =>
+      col.cards.some((c) => String(c.bookId) === String(bookIdToStore))
+    );
+
+    if (isAlreadyPresent) {
+      return res.status(200).json({
+        success: true,
+        message: "Book already added to workspace",
+        workspace,
+      });
+    }
+
     const newCard = {
       id: `card-${Date.now()}`,
-      bookId,
+      bookId: bookIdToStore,
       title,
       author,
       cover,
+      previewLink: previewLink || null,
+      extractedContent: extractedContent || null,
     };
 
     column.cards.push(newCard);

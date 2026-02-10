@@ -16,11 +16,14 @@ export default function Reader() {
   const [bookInfo, setBookInfo] = useState(null);
   const [volumeAccess, setVolumeAccess] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [localFileText, setLocalFileText] = useState(null);
+  const [localFileLoading, setLocalFileLoading] = useState(false);
+  const [localFileError, setLocalFileError] = useState(null);
   
   const bookTitle = location.state?.title || "Book";
   const bookAuthor = location.state?.author || "Author";
   const locationISBNs = useMemo(() => location.state?.isbns || [], [location.state?.isbns]);
-  const locationPreviewLink = location.state?.previewLink;
+  const locationPreviewLink = location.state?.previewLink || location.state?.contentUrl;
 
   // Refs to manage viewer lifecycle without forcing re-renders
   const viewerRef = useRef(null);
@@ -57,6 +60,16 @@ export default function Reader() {
       }
 
       console.log("📚 Loading book with identifiers:", identifiers);
+
+      // If this is a manual/local uploaded file, don't attempt the Google viewer
+      // (it expects Google volume IDs). Use local preview link instead.
+      if (bookId && (bookId.startsWith("manual-") || (bookInfo?.previewLink && bookInfo.previewLink.includes("/uploads/")))) {
+        console.log("Manual/local content detected — skipping Google viewer");
+        // Avoid calling onNotFound here because it's declared later; set state directly
+        setViewer(null);
+        setIsLoading(false);
+        return;
+      }
 
       // If there are no valid identifiers, bail out early — calling
       // the Google viewer with an empty identifier list can throw
@@ -130,7 +143,31 @@ export default function Reader() {
   useEffect(() => {
     const fetchBookInfo = async () => {
       try {
-        // First, use location state data if available
+        // First, fetch metadata from server (handles manual books with extractedContent)
+        if (bookId) {
+          try {
+            const res = await fetch(`/api/google-books/volumes/${encodeURIComponent(bookId)}`);
+            if (res.ok) {
+              const data = await res.json();
+              const vi = data.volumeInfo || {};
+              setBookInfo({
+                title: vi.title || location.state?.title || bookTitle || "Book",
+                author: vi.authors?.[0] || location.state?.author || bookAuthor || "Author",
+                description: vi.description || location.state?.description || "No description available",
+                pages: vi.pageCount || location.state?.pages || 0,
+                cover: vi.imageLinks?.medium || vi.imageLinks?.thumbnail || location.state?.cover_url || null,
+                previewLink: vi.previewLink || data.contentUrl || locationPreviewLink || null,
+                extractedContent: data.extractedContent || location.state?.extractedContent || null,
+              });
+              setVolumeAccess(data.accessInfo || null);
+              return;
+            }
+          } catch (apiErr) {
+            console.warn("API fetch failed, falling back to location state:", apiErr.message);
+          }
+        }
+
+        // Fallback: use location state data if available
         if (location.state?.title) {
           setBookInfo({
             title: location.state.title,
@@ -139,12 +176,13 @@ export default function Reader() {
             pages: location.state.pages || 0,
             cover: location.state.cover_url || null,
             previewLink: locationPreviewLink || null,
+            extractedContent: location.state.extractedContent || null,
           });
-          return; // Don't do additional search if we have good data
+          return;
         }
 
+        // Last resort: search Google Books
         const query = encodeURIComponent(`${bookTitle} ${bookAuthor}`);
-        // Use server proxy to avoid exposing API key and reduce client-side rate limits
         const res = await fetch(`/api/search?q=${query}&page=1`);
         const data = await res.json();
 
@@ -157,6 +195,7 @@ export default function Reader() {
             pages: book.pageCount || book.pages || 0,
             cover: book.cover_url || book.imageLinks || null,
             previewLink: book.previewLink || null,
+            extractedContent: null,
           });
         } else {
           setBookInfo({
@@ -166,10 +205,11 @@ export default function Reader() {
             pages: 0,
             cover: null,
             previewLink: null,
+            extractedContent: null,
           });
         }
       } catch {
-        console.log("Could not fetch book info from Google Books API");
+        console.log("Could not fetch book info");
         setBookInfo({
           title: bookTitle,
           author: bookAuthor,
@@ -177,48 +217,15 @@ export default function Reader() {
           pages: 0,
           cover: null,
           previewLink: null,
+          extractedContent: null,
         });
       }
     };
 
-    if (bookTitle) {
+    if (bookId || (location.state?.title && bookTitle)) {
       fetchBookInfo();
     }
-  }, [bookTitle, bookAuthor, locationPreviewLink, location.state]);
-
-  // Fetch volume metadata (accessInfo) from server proxy when we have a bookId
-  useEffect(() => {
-    const fetchVolume = async () => {
-      if (!bookId) return;
-      try {
-        const res = await fetch(`/api/google-books/volumes/${encodeURIComponent(bookId)}`);
-        
-        // 404 means volume not found in Google Books (likely legacy Open Library ID)
-        if (res.status === 404) {
-          console.warn(`⚠️ Volume ${bookId} not found in Google Books (may be legacy ID)`);
-          return;
-        }
-        
-        if (!res.ok) throw new Error(`Volume fetch failed: ${res.status}`);
-        const data = await res.json();
-        const vi = data.volumeInfo || {};
-        setBookInfo((prev) => ({
-          title: vi.title || prev?.title || prev?.title || "Book",
-          author: vi.authors?.[0] || prev?.author || prev?.author || "Author",
-          description: vi.description || prev?.description || "No description available",
-          pages: vi.pageCount || prev?.pages || 0,
-          cover: vi.imageLinks?.medium || vi.imageLinks?.thumbnail || prev?.cover || null,
-          previewLink: vi.previewLink || null,
-        }));
-        setVolumeAccess(data.accessInfo || null);
-      } catch (err) {
-        // Fallback: keep using the title/author search (already handled by other effect)
-        console.warn("Volume metadata fetch failed, falling back to search: ", err.message);
-      }
-    };
-
-    fetchVolume();
-  }, [bookId]);
+  }, [bookId, bookTitle, bookAuthor, locationPreviewLink, location.state]);
 
   // Initialize Google Books Embedded Viewer API
   // Uses the official Google Books API Loader to ensure proper initialization
@@ -293,6 +300,43 @@ export default function Reader() {
     }
   }, [bookId]);
 
+  // If the server provided a previewLink that points to a locally uploaded text file,
+  // fetch and render it inline (so .txt uploads preview inside the Reader).
+  useEffect(() => {
+    const preview = bookInfo?.previewLink;
+    if (!preview) {
+      setLocalFileText(null);
+      setLocalFileError(null);
+      setLocalFileLoading(false);
+      return;
+    }
+
+    const isLocalUpload = preview.includes("/uploads/");
+    const lower = preview.toLowerCase();
+    const isTextFile = lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".log") || lower.endsWith(".text");
+
+    if (isLocalUpload && isTextFile) {
+      setLocalFileLoading(true);
+      setLocalFileError(null);
+      fetch(preview)
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`Failed to fetch file: ${res.status}`);
+          const text = await res.text();
+          setLocalFileText(text);
+        })
+        .catch((err) => {
+          console.error("Failed to load local text file preview:", err);
+          setLocalFileError(err.message || "Failed to load file");
+          setLocalFileText(null);
+        })
+        .finally(() => setLocalFileLoading(false));
+    } else {
+      setLocalFileText(null);
+      setLocalFileError(null);
+      setLocalFileLoading(false);
+    }
+  }, [bookInfo?.previewLink]);
+
   // Trigger viewer initialization when container ref is ready and API is loaded
   useEffect(() => {
     if (!bookId || !viewerContainerRef.current) return;
@@ -351,7 +395,31 @@ export default function Reader() {
   };
 
   const handleNoteAdded = (newNote) => {
-    setNotes([newNote, ...notes]);
+    setNotes((prev) => sortNotes([newNote, ...prev]));
+  };
+
+  const handleNoteUpdated = (updatedNote) => {
+    setNotes((prev) => {
+      const merged = prev.map((n) => (n._id === updatedNote._id ? { ...n, ...updatedNote } : n));
+      // If the updated note wasn't present (unlikely), add it
+      const exists = merged.some((n) => n._id === updatedNote._id);
+      if (!exists) merged.unshift(updatedNote);
+      return sortNotes(merged);
+    });
+  };
+
+  // Helper: place pinned notes first, then sort by updatedAt desc, then createdAt desc
+  const sortNotes = (list) => {
+    if (!Array.isArray(list)) return [];
+    return [...list].sort((a, b) => {
+      // pinned first
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+
+      const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
   };
 
   // Cleanup viewer on unmount to avoid DOM mutations that conflict with React
@@ -386,7 +454,7 @@ export default function Reader() {
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-700 rounded transition flex-shrink-0"
+            className="p-2 hover:bg-gray-700 rounded transition shrink-0"
             title="Go back"
           >
             <ChevronLeft size={20} className="text-white sm:w-6 sm:h-6" />
@@ -396,6 +464,15 @@ export default function Reader() {
             <p className="text-xs sm:text-sm text-gray-400 truncate">{bookInfo?.author}</p>
           </div>
         </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowNotesSidebar((s) => !s)}
+              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-sm text-white rounded transition"
+              title="Toggle notes sidebar"
+            >
+              Notes
+            </button>
+          </div>
       </div>
 
       {/* Main Content Area */}
@@ -415,8 +492,108 @@ export default function Reader() {
               }}
             ></div>
 
+            {/* If we have a locally uploaded PDF (served from /uploads), embed it directly */}
+            {!viewer && bookInfo?.previewLink && bookInfo.previewLink.includes("/uploads/") && bookInfo.previewLink.toLowerCase().endsWith(".pdf") && (
+              <div className="w-full h-full">
+                <iframe
+                  title="Local PDF Preview"
+                  src={bookInfo.previewLink}
+                  className="w-full h-full border-0"
+                />
+                <div className="text-center mt-2">
+                  <a href={bookInfo.previewLink} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">
+                    Open PDF in new tab / download
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Text file preview (.txt, .md, etc.) */}
+            {!viewer && localFileLoading && (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Loader className="animate-spin text-blue-500 mx-auto mb-4" size={32} />
+                  <p className="text-gray-400">Loading preview…</p>
+                </div>
+              </div>
+            )}
+
+            {!viewer && localFileError && (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center max-w-md">
+                  <p className="text-red-400 mb-2">Error loading file:</p>
+                  <p className="text-gray-400 text-sm">{localFileError}</p>
+                </div>
+              </div>
+            )}
+
+            {!viewer && localFileText && (
+              <div className="h-full overflow-auto bg-gray-800 p-4 sm:p-6">
+                <pre
+                  style={{
+                    backgroundColor: "#1a1a1a",
+                    padding: "15px",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                    lineHeight: "1.6",
+                    fontFamily: "'Courier New', monospace",
+                    whiteSpace: "pre-wrap",
+                    wordWrap: "break-word",
+                    border: "1px solid #333",
+                    color: "#e0e0e0",
+                  }}
+                >
+                  {localFileText}
+                </pre>
+                {bookInfo?.previewLink && (
+                  <div className="mt-4 flex justify-center">
+                    <a
+                      href={bookInfo.previewLink}
+                      download
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition"
+                    >
+                      Download File
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Extracted content preview (from Word documents) */}
+            {!viewer && bookInfo?.extractedContent && !localFileText && (
+              <div className="h-full overflow-auto bg-gray-800 p-4 sm:p-6">
+                <pre
+                  style={{
+                    backgroundColor: "#1a1a1a",
+                    padding: "15px",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                    lineHeight: "1.6",
+                    fontFamily: "'Courier New', monospace",
+                    whiteSpace: "pre-wrap",
+                    wordWrap: "break-word",
+                    border: "1px solid #333",
+                    color: "#e0e0e0",
+                  }}
+                >
+                  {bookInfo.extractedContent}
+                </pre>
+                {bookInfo?.previewLink && (
+                  <div className="mt-4 flex justify-center">
+                    <a
+                      href={bookInfo.previewLink}
+                      download
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition"
+                    >
+                      Download File
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Fallback UI when no preview available */}
-            {!viewer && bookInfo && (
+            {!viewer && bookInfo && !localFileText && !localFileLoading && !bookInfo?.extractedContent && (
                 <div className="max-w-4xl mx-auto w-full h-full overflow-auto">
                   <div className="bg-linear-to-b from-gray-800 to-gray-900 rounded-lg p-4 sm:p-6 lg:p-8 text-white min-h-full flex flex-col items-center justify-center">
                     <div className="flex flex-col md:flex-row gap-6 sm:gap-8 items-start md:items-center max-w-2xl">
@@ -432,7 +609,7 @@ export default function Reader() {
                             }}
                           />
                         ) : (
-                          <div className="bg-linear-to-br from-blue-500 to-purple-600 rounded-lg shadow-2xl h-48 sm:h-64 md:h-80 w-32 sm:w-40 md:w-56 flex items-center justify-center flex-shrink-0">
+                          <div className="bg-linear-to-br from-blue-500 to-purple-600 rounded-lg shadow-2xl h-48 sm:h-64 md:h-80 w-32 sm:w-40 md:w-56 flex items-center justify-center shrink-0">
                             <BookOpen size={48} className="text-white opacity-50 sm:w-20 sm:h-20 md:w-24 md:h-24" />
                           </div>
                         )}
@@ -515,7 +692,7 @@ export default function Reader() {
             <button
               onClick={handlePreviousPage}
               disabled={!viewer}
-              className="p-2 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed rounded transition flex-shrink-0"
+              className="p-2 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed rounded transition shrink-0"
               title="Previous page (← Arrow)"
             >
               <ChevronLeft size={20} className="text-white sm:w-6 sm:h-6" />
@@ -526,7 +703,7 @@ export default function Reader() {
                 {viewer ? "📖 Preview" : "No preview"}
               </span>
               {viewer && (
-                <div className="flex gap-1 border-l border-gray-600 pl-2 ml-2 flex-shrink-0">
+                <div className="flex gap-1 border-l border-gray-600 pl-2 ml-2 shrink-0">
                   <button
                     onClick={handleZoomOut}
                     disabled={!viewer}
@@ -550,7 +727,7 @@ export default function Reader() {
             <button
               onClick={handleNextPage}
               disabled={!viewer}
-              className="p-2 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed rounded transition flex-shrink-0"
+              className="p-2 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed rounded transition shrink-0"
               title="Next page (→ Arrow)"
             >
               <ChevronRight size={20} className="text-white sm:w-6 sm:h-6" />
@@ -559,14 +736,17 @@ export default function Reader() {
         </div>
 
         {/* Notes Sidebar - Full width on mobile, 30% on lg screens */}
-        <div className="w-full lg:w-3/10 border-l-0 lg:border-l border-gray-700 flex flex-col border-t lg:border-t-0 mt-0">
-          <NotesSidebar
-            bookId={bookId}
-            currentPage={currentPage}
-            notes={notes}
-            onNoteAdded={handleNoteAdded}
-          />
-        </div>
+        {showNotesSidebar && (
+          <div className="w-full lg:w-3/10 border-l-0 lg:border-l border-gray-700 flex flex-col border-t lg:border-t-0 mt-0">
+            <NotesSidebar
+              bookId={bookId}
+              currentPage={currentPage}
+              notes={notes}
+              onNoteAdded={handleNoteAdded}
+              onNoteUpdated={handleNoteUpdated}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

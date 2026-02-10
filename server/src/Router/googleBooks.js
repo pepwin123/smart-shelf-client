@@ -1,5 +1,6 @@
 import express from "express";
 import axios from "axios";
+import Book from "../Models/bookModel.js";
 
 const router = express.Router();
 
@@ -21,6 +22,55 @@ router.get("/volumes/:id", async (req, res) => {
     const API_KEY = process.env.GOOGLE_BOOKS_API_KEY || "";
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: "Missing volume id" });
+
+    // If this is a locally created manual book id (starts with 'manual-'),
+    // or the client accidentally passed a MongoDB ObjectId for a stored Book,
+    // return stored metadata from DB instead of calling Google Books.
+    try {
+      if (id.startsWith("manual-")) {
+        const book = await Book.findOne({ googleBooksVolumeId: id }).lean();
+        if (book) {
+          const volumeLike = {
+            id: book.googleBooksVolumeId,
+            volumeInfo: {
+              title: book.title || "",
+              authors: book.authors || [],
+              description: book.description || "",
+              pageCount: book.pageCount || 0,
+              imageLinks: book.coverUrl ? { thumbnail: book.coverUrl, medium: book.coverUrl } : undefined,
+            },
+            accessInfo: {},
+            contentUrl: book.contentUrl || null,
+            extractedContent: book.extractedContent || null,
+          };
+          return res.json(volumeLike);
+        }
+      }
+
+      // If id looks like a MongoDB ObjectId, try to resolve it to a Book record
+      if (/^[0-9a-fA-F]{24}$/.test(id)) {
+        const bookById = await Book.findById(id).lean();
+        if (bookById) {
+          const volumeLike = {
+            id: bookById.googleBooksVolumeId || bookById._id.toString(),
+            volumeInfo: {
+              title: bookById.title || "",
+              authors: bookById.authors || [],
+              description: bookById.description || "",
+              pageCount: bookById.pageCount || 0,
+              imageLinks: bookById.coverUrl ? { thumbnail: bookById.coverUrl, medium: bookById.coverUrl } : undefined,
+            },
+            accessInfo: {},
+            contentUrl: bookById.contentUrl || null,
+            extractedContent: bookById.extractedContent || null,
+          };
+          return res.json(volumeLike);
+        }
+      }
+    } catch (dbErr) {
+      console.error("Error fetching manual/book metadata in google-books route:", dbErr.message || dbErr);
+      // fall through to normal behavior
+    }
 
     // Try candidate ids: the stored id and, if it starts with '-', the id without leading hyphen.
     const candidates = [id];

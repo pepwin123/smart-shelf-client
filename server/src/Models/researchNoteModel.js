@@ -25,12 +25,6 @@ const researchNoteSchema = new mongoose.Schema({
     required: true,
   },
   tags: [String],
-  collaborators: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
-  ],
   pinned: {
     type: Boolean,
     default: false,

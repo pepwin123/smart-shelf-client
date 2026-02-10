@@ -16,7 +16,6 @@ export const createNote = async (req, res) => {
       pageNumber,
       content,
       tags: tags || [],
-      collaborators: [userId],
     });
 
     if (req.io && workspaceId) {
@@ -52,7 +51,6 @@ export const getNotesByBook = async (req, res) => {
 
     const notes = await ResearchNote.find({ googleBooksVolumeId })
       .populate("userId", "username email")
-      .populate("collaborators", "username email")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -73,7 +71,7 @@ export const getNotesByBook = async (req, res) => {
 export const updateNote = async (req, res) => {
   try {
     const { id } = req.params;
-    const { content, tags, chapterId, pageNumber } = req.body;
+    const { content, tags, chapterId, pageNumber, pinned } = req.body;
     const userId = req.user._id;
 
     const note = await ResearchNote.findById(id);
@@ -85,12 +83,10 @@ export const updateNote = async (req, res) => {
       });
     }
 
-    // Check if user is owner or collaborator
-    const isAuthorized =
-      note.userId.toString() === userId.toString() ||
-      note.collaborators.some((c) => c.toString() === userId.toString());
+    // Check if user is owner
+    const isOwner = note.userId.toString() === userId.toString();
 
-    if (!isAuthorized) {
+    if (!isOwner) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to update this note",
@@ -101,6 +97,8 @@ export const updateNote = async (req, res) => {
     if (tags) note.tags = tags;
     if (chapterId) note.chapterId = chapterId;
     if (pageNumber) note.pageNumber = pageNumber;
+    // Allow toggling pinned state
+    if (typeof pinned === "boolean") note.pinned = pinned;
 
     note.updatedAt = new Date();
     await note.save();
@@ -142,12 +140,10 @@ export const deleteNote = async (req, res) => {
       });
     }
 
-    // Check if user is owner or collaborator
-    const isAuthorized =
-      note.userId.toString() === userId.toString() ||
-      note.collaborators.some((c) => c.toString() === userId.toString());
+    // Check if user is owner
+    const isOwner = note.userId.toString() === userId.toString();
 
-    if (!isAuthorized) {
+    if (!isOwner) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to delete this note",

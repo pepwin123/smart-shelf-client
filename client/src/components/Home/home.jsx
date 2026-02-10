@@ -53,21 +53,6 @@ export default function Home({setUser}) {
         };
     }, []);
 
-    // Handle when a book is added to workspace
-    const handleBookAdded = (workspace) => {
-        const s = socketRef.current;
-        if (s && workspace) {
-            const workspaceId = workspace._id;
-            // Emit event so other users see real-time update
-            s.emit("card-added", {
-                workspaceId,
-                workspace,
-                message: `A book was added to "${workspace.name}"`,
-            });
-            console.log("✅ Book added event emitted to all users in workspace");
-        }
-    };
-
     const handleSearchResults = (results, total) => {
         setBooks(results);
         setTotalResults(total);
@@ -99,7 +84,7 @@ export default function Home({setUser}) {
                 {loading && <p className="text-center text-gray-400 mb-8">Loading books...</p>}
                 
                 <div className="mb-8">
-                    <SearchResults books={books} onBookAdded={handleBookAdded} />
+                    <SearchResults books={books} />
                 </div>
 
                 {/* Pagination Controls */}

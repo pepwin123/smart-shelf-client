@@ -1,0 +1,17 @@
+import mongoose from "mongoose";
+
+This uses ES Modules syntax to import the mongoose library.
+
+mongoose is an ODM (Object Data Modeling) library for MongoDB.
+
+It helps you:
+
+Define schemas
+
+Create models
+
+Connect to MongoDB
+
+Run queries in a structured way
+
+👉 Without this line, you cannot talk to MongoDB using Mongoose.

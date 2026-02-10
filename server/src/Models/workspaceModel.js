@@ -41,10 +41,6 @@ const workspaceSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  collaborators: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  }],
   columns: [columnSchema],
   createdAt: {
     type: Date,

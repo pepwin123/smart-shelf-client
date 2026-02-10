@@ -2,22 +2,22 @@ import axios from "axios";
 import { useState } from "react";
 import { Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import WorkspaceSelectorModal from "../Workspace/WorkspaceSelectorModal";
 
 export default function BookCard({ book, onBookAdded }) {
   const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleAddShelf = async () => {
-    const workspaceId = localStorage.getItem("lastWorkspaceId");
-    if (!workspaceId) {
-      alert("No workspace selected");
-      return;
-    }
+    // Open workspace selector modal so user can pick target workspace
+    setIsModalOpen(true);
+  };
 
+  const handleWorkspaceSelect = async (workspaceId) => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      // Use Google Books volume ID (always available from API response)
       const bookId = book.id || book.key;
 
       await axios.post(
@@ -28,16 +28,19 @@ export default function BookCard({ book, onBookAdded }) {
           title: book.title || "Unknown",
           author: book.author_name?.join(", ") || "Unknown",
           cover: book.cover_url || null,
+          previewLink: book.previewLink || null,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      alert("✅ Book added!");
+      alert("✅ Book added to workspace");
       if (onBookAdded) onBookAdded();
-    } catch {
-      alert("Failed to add book");
+    } catch (err) {
+      console.error("Add to workspace failed:", err);
+      alert("Failed to add book to workspace");
     } finally {
       setIsLoading(false);
+      setIsModalOpen(false);
     }
   };
 
@@ -49,11 +52,13 @@ export default function BookCard({ book, onBookAdded }) {
       state: {
         title: book.title,
         author: book.author_name?.join(", "),
-        previewLink: book.previewLink,
+        previewLink: book.previewLink || book.contentUrl,
         cover_url: book.cover_url,
         description: book.description,
         pages: book.pages,
         isbns: book.isbns,
+        contentUrl: book.contentUrl,
+        extractedContent: book.extractedContent,
       },
     });
   };
@@ -98,6 +103,11 @@ export default function BookCard({ book, onBookAdded }) {
           <span className="sm:hidden">{isLoading ? "..." : "+"}</span>
         </button>
       </div>
+      <WorkspaceSelectorModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSelect={handleWorkspaceSelect}
+      />
     </div>
   );
 }

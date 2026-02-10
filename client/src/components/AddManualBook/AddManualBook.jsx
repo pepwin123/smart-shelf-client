@@ -72,7 +72,8 @@ export default function AddManualBook({ isOpen, onClose }) {
       }
 
       let uploadedPdfUrl = null;
-      // If user selected a PDF, upload it
+      let uploadedContentText = null;
+      // If user selected a content file (PDF/TXT/DOC/DOCX), upload it
       if (pdfFile) {
         const formData = new FormData();
         formData.append("file", pdfFile);
@@ -83,10 +84,11 @@ export default function AddManualBook({ isOpen, onClose }) {
           },
         });
         uploadedPdfUrl = uploadRes.data.url;
+        uploadedContentText = uploadRes.data.contentText || null;
       }
 
-      // Generate a unique ID for manual books
-      const manualBookId = `manual-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      // Generate a unique ID for manual books - include more randomness to ensure uniqueness
+      const manualBookId = `manual-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
       const payload = {
         id: manualBookId,
@@ -96,10 +98,11 @@ export default function AddManualBook({ isOpen, onClose }) {
         first_publish_year: year ? Number(year) : null,
         subject: subjects ? subjects.split(",").map(s => s.trim()) : [],
         has_fulltext: !!uploadedPdfUrl,
-        description: description || "",
+        description: description || uploadedContentText || "",
         pages: 0,
         cover_url: uploadedCoverUrl || null,
         contentUrl: uploadedPdfUrl || null,
+        extractedContent: uploadedContentText || null,
       };
 
       const res = await axios.post("/api/books/books", payload, {
@@ -113,13 +116,14 @@ export default function AddManualBook({ isOpen, onClose }) {
         setPendingAddToWorkspace(saved);
         setShowWorkspaceModal(true);
       } else {
-        alert("Book added successfully");
+        alert("✅ Book added successfully");
         reset();
         onClose();
       }
     } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Failed to add book");
+      console.error("Error saving book:", err);
+      const errorMsg = err.response?.data?.message || err.message || "Failed to add book";
+      alert(`❌ ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -128,10 +132,27 @@ export default function AddManualBook({ isOpen, onClose }) {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.type !== "application/pdf") {
-      alert("Please select a PDF file");
+
+    // Acceptable MIME types and extensions
+    const acceptedMIMEs = [
+      "application/pdf",
+      "text/plain",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    const acceptedExt = [".pdf", ".txt", ".doc", ".docx"];
+
+    const fileType = file.type;
+    const nameLower = (file.name || "").toLowerCase();
+
+    const hasAcceptedMIME = acceptedMIMEs.includes(fileType);
+    const hasAcceptedExt = acceptedExt.some((ext) => nameLower.endsWith(ext));
+
+    if (!hasAcceptedMIME && !hasAcceptedExt) {
+      alert("Please select a PDF, TXT, or Word (.doc/.docx) file");
       return;
     }
+
     setPdfFile(file);
     setPdfName(file.name);
   };
@@ -154,6 +175,8 @@ export default function AddManualBook({ isOpen, onClose }) {
           title: book.title,
           author: (book.authors || book.author_name || []).join(", "),
           cover: book.coverUrl || book.cover_url || null,
+          previewLink: book.contentUrl || null,
+          extractedContent: book.extractedContent || null,
           metadata: book,
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -232,9 +255,9 @@ export default function AddManualBook({ isOpen, onClose }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Upload PDF (optional)</label>
-              <input type="file" accept="application/pdf" onChange={handleFileChange} className="w-full p-2 border rounded" />
-              {pdfName && <p className="text-xs text-gray-600 mt-1">Selected: {pdfName}</p>}
+              <label className="block text-sm font-medium text-gray-700">Upload file (PDF, TXT, DOC, DOCX) (optional)</label>
+                <input type="file" accept=".pdf,.txt,.doc,.docx" onChange={handleFileChange} className="w-full p-2 border rounded" />
+                {pdfName && <p className="text-xs text-gray-600 mt-1">Selected: {pdfName}</p>}
             </div>
 
             <div className="flex items-center gap-3">

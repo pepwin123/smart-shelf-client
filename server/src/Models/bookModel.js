@@ -6,6 +6,7 @@ const bookSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      sparse: true,
       index: true,
       description: "Google Books volume ID (e.g., zyTCAlFPjgYC)",
     },
@@ -15,6 +16,7 @@ const bookSchema = new mongoose.Schema(
     publishedDate: String,
     coverUrl: String,
     contentUrl: String,
+    extractedContent: String,
     subjects: [String],
     description: String,
     pageCount: Number,
@@ -35,5 +37,18 @@ const bookSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Drop any old indexes that might be causing issues
+bookSchema.pre('init', function(next) {
+  next();
+});
+
 const Book = mongoose.models.Book || mongoose.model("Book", bookSchema);
+
+// Drop old problematic indexes on startup
+if (typeof Book.collection !== 'undefined') {
+  Book.collection.dropIndex('openLibraryId_1').catch(() => {
+    // Index might not exist, that's fine
+  });
+}
+
 export default Book;

@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { X, Plus, Trash2, Pin } from "lucide-react";
+import { X, Plus, Trash2, Pin, Edit } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
-export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdded }) {
+export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdded, onNoteUpdated }) {
   const [showForm, setShowForm] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [chapterId, setChapterId] = useState("");
@@ -11,6 +11,11 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
   const [tags, setTags] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedNote, setSelectedNote] = useState(null);
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editContent, setEditContent] = useState("");
+  const [editChapterId, setEditChapterId] = useState("");
+  const [editPageNumber, setEditPageNumber] = useState(currentPage);
+  const [editTags, setEditTags] = useState("");
 
   const handleCreateNote = async (e) => {
     e.preventDefault();
@@ -67,17 +72,79 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
     }
   };
 
-  const handlePinNote = async (noteId, isPinned) => {
+  const handleStartEdit = (note) => {
+    // Close create form if open
+    setShowForm(false);
+    setEditingNoteId(note._id);
+    setEditContent(note.content || "");
+    setEditChapterId(note.chapterId || "");
+    setEditPageNumber(note.pageNumber || currentPage);
+    setEditTags((note.tags || []).join(", "));
+    // ensure note is expanded for editing UI
+    setSelectedNote(note._id);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNoteId(null);
+    setEditContent("");
+    setEditChapterId("");
+    setEditPageNumber(currentPage);
+    setEditTags("");
+  };
+
+  const handleSaveEdit = async (noteId) => {
+    if (!editContent.trim()) {
+      alert("Note content cannot be empty");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       const token = localStorage.getItem("token");
-      await axios.patch(
+      const res = await axios.patch(
+        `/api/notes/${noteId}`,
+        {
+          content: editContent,
+          chapterId: editChapterId || undefined,
+          pageNumber: parseInt(editPageNumber) || undefined,
+          tags: editTags ? editTags.split(",").map((t) => t.trim()) : undefined,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const updatedNote = res.data?.note;
+      if (onNoteUpdated && updatedNote) onNoteUpdated(updatedNote);
+      setEditingNoteId(null);
+      alert("✅ Note saved!");
+    } catch (error) {
+      console.error("Failed to save note:", error);
+      alert(error.response?.data?.message || "Failed to save note");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePinNote = async (noteId, isPinned) => {
+    // Optimistic update: update UI immediately, revert on error
+    const optimistic = { _id: noteId, pinned: !isPinned, updatedAt: new Date().toISOString() };
+    if (onNoteUpdated) onNoteUpdated(optimistic);
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.patch(
         `/api/notes/${noteId}`,
         { pinned: !isPinned },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      const updatedNote = res.data?.note;
+      if (onNoteUpdated && updatedNote) onNoteUpdated(updatedNote);
       alert("✅ Note updated!");
     } catch (error) {
       console.error("Failed to pin note:", error);
+      // Revert optimistic change
+      if (onNoteUpdated) onNoteUpdated({ _id: noteId, pinned: isPinned });
+      alert(error.response?.data?.message || "Failed to update note");
     }
   };
 
@@ -230,6 +297,16 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      handleStartEdit(note);
+                    }}
+                    className="p-1 text-gray-400 hover:text-gray-300 rounded transition"
+                    title="Edit note"
+                  >
+                    <Edit size={14} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
                       handleDeleteNote(note._id);
                     }}
                     className="p-1 text-gray-400 hover:text-red-400 rounded transition"
@@ -263,9 +340,70 @@ export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdd
               {/* Full Content (when selected) */}
               {selectedNote === note._id && (
                 <div className="mt-3 pt-3 border-t border-gray-600">
-                  <div className="prose prose-sm prose-invert max-w-none text-gray-300">
-                    <ReactMarkdown>{note.content}</ReactMarkdown>
-                  </div>
+                  {editingNoteId === note._id ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-300 mb-1">Chapter/Section</label>
+                        <input
+                          type="text"
+                          value={editChapterId}
+                          onChange={(e) => setEditChapterId(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-700 text-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-300 mb-1">Page</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={editPageNumber}
+                          onChange={(e) => setEditPageNumber(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-700 text-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-300 mb-1">Content (Markdown)</label>
+                        <textarea
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          rows="4"
+                          className="w-full px-3 py-2 bg-gray-700 text-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-300 mb-1">Tags (comma-separated)</label>
+                        <input
+                          type="text"
+                          value={editTags}
+                          onChange={(e) => setEditTags(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-700 text-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleSaveEdit(note._id); }}
+                          disabled={isSubmitting}
+                          className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded font-medium text-sm transition"
+                        >
+                          {isSubmitting ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCancelEdit(); }}
+                          className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium text-sm transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="prose prose-sm prose-invert max-w-none text-gray-300">
+                      <ReactMarkdown>{note.content}</ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

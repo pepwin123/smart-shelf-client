@@ -1,5 +1,13 @@
 import axios from "axios";
 import Book from "../Models/bookModel.js";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+import mammoth from "mammoth";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDir = path.join(__dirname, "../../uploads");
 
 export const searchBooks = async (req, res, next) => {
   try {
@@ -104,36 +112,108 @@ export const saveBook = async (req, res, next) => {
       description,
       pages,
       contentUrl,
+      extractedContent,
     } = req.body;
 
-    const book = await Book.create({
-      googleBooksVolumeId: id || key,
-      title,
-      authors: author_name,
-      firstPublishYear: first_publish_year,
-      coverUrl: cover_url || null,
-      contentUrl: contentUrl || null,
-      subjects: subject,
-      availability: {
-        readable: has_fulltext,
-      },
-      description: description || "",
-      pageCount: pages || 0,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Book saved successfully",
-      book,
-    });
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: "Book already saved",
-      });
+    // For manual books, ensure uniqueness by adding extra randomness if needed
+    // Always generate a unique ID - never use null/undefined
+    let volumeId = id || key;
+    
+    if (!volumeId || volumeId === "null" || volumeId === "undefined") {
+      // Generate a truly unique ID for manual/new books
+      volumeId = `manual-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    } else if (!volumeId.startsWith("manual-")) {
+      // For Google Books IDs, keep them as-is, but ensure they're never null
+      volumeId = String(volumeId).trim();
     }
-    next(error);
+
+    // Final safety check - ensure volumeId is never empty or null
+    if (!volumeId || volumeId.trim() === "") {
+      volumeId = `manual-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    }
+
+    // Prevent duplicates: if this file/url or volume id already exists, return existing
+    try {
+      let existing = null;
+      if (contentUrl) {
+        existing = await Book.findOne({ contentUrl });
+      }
+      if (!existing) {
+        existing = await Book.findOne({ googleBooksVolumeId: volumeId });
+      }
+      if (existing) {
+        return res.status(200).json({
+          success: true,
+          message: "Book already exists",
+          book: existing,
+        });
+      }
+
+      const book = await Book.create({
+        googleBooksVolumeId: volumeId,
+        title: title || "Untitled",
+        authors: Array.isArray(author_name) ? author_name : (author_name ? [author_name] : []),
+        firstPublishYear: first_publish_year || null,
+        coverUrl: cover_url || null,
+        contentUrl: contentUrl || null,
+        extractedContent: extractedContent || null,
+        subjects: Array.isArray(subject) ? subject : (subject ? [subject] : []),
+        availability: {
+          readable: has_fulltext || false,
+        },
+        description: description || "",
+        pageCount: pages || 0,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Book saved successfully",
+        book,
+      });
+    } catch (createError) {
+      // If duplicate error, try to update existing or return it
+      if (createError.code === 11000) {
+        console.warn("Duplicate key error, attempting to find existing book:", createError.keyValue);
+        const keyVal = createError.keyValue?.googleBooksVolumeId || volumeId;
+        const existing = await Book.findOne({ googleBooksVolumeId: keyVal });
+        if (existing) {
+          return res.status(200).json({
+            success: true,
+            message: "Book already exists",
+            book: existing,
+          });
+        }
+        // If we can't find the existing book, generate a new unique ID and try again
+        const newVolumeId = `manual-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        const retryBook = await Book.create({
+          googleBooksVolumeId: newVolumeId,
+          title,
+          authors: author_name,
+          firstPublishYear: first_publish_year,
+          coverUrl: cover_url || null,
+          contentUrl: contentUrl || null,
+          extractedContent: extractedContent || null,
+          subjects: subject,
+          availability: {
+            readable: has_fulltext,
+          },
+          description: description || "",
+          pageCount: pages || 0,
+        });
+        return res.status(201).json({
+          success: true,
+          message: "Book saved successfully",
+          book: retryBook,
+        });
+      }
+      throw createError;
+    }
+  } catch (error) {
+    console.error("Save book error:", error.message || error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to save book",
+    });
   }
 };
 
@@ -234,10 +314,30 @@ export const uploadBookFile = async (req, res, next) => {
 
     // The server serves uploaded files from /uploads
     const filename = req.file.filename;
-    const serverUrl = process.env.SERVER_URL || "";
+    // Prefer explicit SERVER_URL, otherwise build from the incoming request so
+    // we return an absolute URL the client can fetch (important in dev).
+    const serverUrl = process.env.SERVER_URL || `${req.protocol}://${req.get("host")}`;
     const fileUrl = `${serverUrl}/uploads/${filename}`;
 
-    res.json({ success: true, url: fileUrl, filename });
+    // Try to extract text for supported types (.txt and .docx)
+    const ext = path.extname(filename).toLowerCase();
+    let contentText = null;
+
+    try {
+      const filePath = path.join(uploadsDir, filename);
+      if (ext === ".txt") {
+        const data = await fs.readFile(filePath, "utf8");
+        contentText = data.slice(0, 20000); // limit size returned
+      } else if (ext === ".docx") {
+        const result = await mammoth.extractRawText({ path: filePath });
+        contentText = (result?.value || "").slice(0, 20000);
+      }
+    } catch (extractErr) {
+      // Non-fatal: just log and continue without extracted text
+      console.warn("Failed to extract text from uploaded file:", extractErr.message || extractErr);
+    }
+
+    res.json({ success: true, url: fileUrl, filename, contentText });
   } catch (error) {
     next(error);
   }
@@ -252,7 +352,7 @@ export const uploadCoverImage = async (req, res, next) => {
 
     // The server serves uploaded files from /uploads
     const filename = req.file.filename;
-    const serverUrl = process.env.SERVER_URL || "";
+    const serverUrl = process.env.SERVER_URL || `${req.protocol}://${req.get("host")}`;
     const fileUrl = `${serverUrl}/uploads/${filename}`;
 
     res.json({ success: true, url: fileUrl, filename });

@@ -33,8 +33,18 @@ const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
   fileFilter: (req, file, cb) => {
-    if (file.mimetype !== "application/pdf") {
-      cb(new Error("Only PDF files are allowed"));
+    const allowedMIMEs = [
+      "application/pdf",
+      "text/plain",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    const allowedExt = [".pdf", ".txt", ".doc", ".docx"];
+    const name = (file.originalname || "").toLowerCase();
+    const hasAllowedExt = allowedExt.some((ext) => name.endsWith(ext));
+
+    if (!allowedMIMEs.includes(file.mimetype) && !hasAllowedExt) {
+      cb(new Error("Only PDF, TXT, DOC and DOCX files are allowed"));
     } else {
       cb(null, true);
     }
