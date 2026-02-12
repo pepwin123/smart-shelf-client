@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 import WorkspaceBoard from "./WorkspaceBoard";
@@ -26,10 +26,12 @@ export default function Workspace({ setUser }) {
       if (res.data.workspaces.length > 0 && !selectedWorkspaceId) {
         const firstId = res.data.workspaces[0]._id;
         setSelectedWorkspaceId(firstId);
-        try { localStorage.setItem('lastWorkspaceId', firstId); } catch(err) {
+        try { localStorage.setItem('lastWorkspaceId', firstId); } 
+        catch(err) {
           console.error('Failed to set localStorage:', err);
         }
       }
+      
     } catch (error) {
       console.error("Failed to fetch workspaces:", error);
       setIsLoading(false);

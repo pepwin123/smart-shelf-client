@@ -152,6 +152,16 @@ export default function Register({setUser}) {
                         >
                             {isSubmitting ? "Registering..." : "Sign Up"}
                         </button>
+                        <div className="mt-5 flex items-center justify-between">
+                            <span className="font-medium">Already have an account?</span>
+                            <button 
+                                type="button"
+                                className="font-medium text-blue-500 hover:text-blue-700"
+                                onClick={() => { navigate('/login'); }}
+                            >
+                                Login
+                            </button>
+                        </div>
                     </form>
             </div> 
         </div>

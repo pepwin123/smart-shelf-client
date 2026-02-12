@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { X } from "lucide-react";
-import WorkspaceSelectorModal from "../Workspace/WorkspaceSelectorModal";
 
 export default function AddManualBook({ isOpen, onClose }) {
   const [title, setTitle] = useState("");
@@ -14,8 +13,6 @@ export default function AddManualBook({ isOpen, onClose }) {
   const [pdfFile, setPdfFile] = useState(null);
   const [pdfName, setPdfName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
-  const [pendingAddToWorkspace, setPendingAddToWorkspace] = useState(null);
 
   if (!isOpen) return null;
 
@@ -44,6 +41,7 @@ export default function AddManualBook({ isOpen, onClose }) {
     reader.onloadend = () => {
       setCoverPreview(reader.result);
     };
+    //readAsDataURL gives you a temporary in-memory URL. starts reading the file.
     reader.readAsDataURL(file);
   };
 
@@ -105,21 +103,13 @@ export default function AddManualBook({ isOpen, onClose }) {
         extractedContent: uploadedContentText || null,
       };
 
-      const res = await axios.post("/api/books/books", payload, {
+      await axios.post("/api/books/books", payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
 
-      const saved = res.data.book || res.data;
-
-      // If user chose to add directly to workspace, open workspace selector
-      if (pendingAddToWorkspace) {
-        setPendingAddToWorkspace(saved);
-        setShowWorkspaceModal(true);
-      } else {
-        alert("✅ Book added successfully");
-        reset();
-        onClose();
-      }
+      alert("✅ Book added successfully");
+      reset();
+      onClose();
     } catch (err) {
       console.error("Error saving book:", err);
       const errorMsg = err.response?.data?.message || err.message || "Failed to add book";
@@ -155,42 +145,6 @@ export default function AddManualBook({ isOpen, onClose }) {
 
     setPdfFile(file);
     setPdfName(file.name);
-  };
-
-  const handleSelectWorkspace = async (workspaceId) => {
-    if (!pendingAddToWorkspace) {
-      setShowWorkspaceModal(false);
-      onClose();
-      return;
-    }
-
-    try {
-      const book = pendingAddToWorkspace;
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `/api/workspaces/${workspaceId}/cards`,
-        {
-          columnId: "to-read",
-          bookId: book.googleBooksVolumeId || book._id || book.key || `book-${Date.now()}`,
-          title: book.title,
-          author: (book.authors || book.author_name || []).join(", "),
-          cover: book.coverUrl || book.cover_url || null,
-          previewLink: book.contentUrl || null,
-          extractedContent: book.extractedContent || null,
-          metadata: book,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      alert("Book saved and added to workspace");
-      setShowWorkspaceModal(false);
-      setPendingAddToWorkspace(null);
-      reset();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to add book to workspace");
-    }
   };
 
   return (
@@ -260,11 +214,6 @@ export default function AddManualBook({ isOpen, onClose }) {
                 {pdfName && <p className="text-xs text-gray-600 mt-1">Selected: {pdfName}</p>}
             </div>
 
-            <div className="flex items-center gap-3">
-              <input id="add-to-ws" type="checkbox" onChange={(e) => setPendingAddToWorkspace(e.target.checked ? true : null)} />
-              <label htmlFor="add-to-ws" className="text-sm text-gray-700">Also add to a workspace</label>
-            </div>
-
             <div className="flex justify-end gap-2 sticky bottom-0 bg-white pt-3">
               <button type="button" onClick={onClose} className="px-4 py-2 border rounded">Cancel</button>
               <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded disabled:bg-gray-400">{loading ? "Saving..." : "Save Book"}</button>
@@ -272,8 +221,6 @@ export default function AddManualBook({ isOpen, onClose }) {
           </form>
         </div>
       </div>
-
-      <WorkspaceSelectorModal isOpen={showWorkspaceModal} onClose={() => setShowWorkspaceModal(false)} onSelect={handleSelectWorkspace} />
     </>
   );
 }

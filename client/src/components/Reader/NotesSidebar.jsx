@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import axios from "axios";
-import { X, Plus, Trash2, Pin, Edit } from "lucide-react";
+import { Plus, Trash2, Pin, Edit } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 export default function NotesSidebar({ bookId, currentPage = 1, notes, onNoteAdded, onNoteUpdated }) {
