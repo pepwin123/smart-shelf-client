@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Loader } from "lucide-react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import NotesSidebar from "./NotesSidebar";
+import NotesSidebar from "./Notes/NotesSidebar";
 import { ReaderHeader, ReaderFooter } from "./ReaderControls";
 import { ReaderViewport } from "./ReaderViewport";
 import { useGoogleBooksViewer, useLocalFilePreview } from "./useReaderHooks";
