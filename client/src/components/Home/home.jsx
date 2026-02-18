@@ -13,6 +13,9 @@ export default function Home({setUser}) {
     const [loading, setLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [currentQuery, setCurrentQuery] = useState(null);
+    const [currentYear, setCurrentYear] = useState(null);
+    const [currentCategory, setCurrentCategory] = useState(null);
+    const [currentAvailability, setCurrentAvailability] = useState(null);
     const [totalResults, setTotalResults] = useState(0);
     const socketRef = useRef(null);
     const abortRef = useRef(null);
@@ -20,10 +23,11 @@ export default function Home({setUser}) {
     const booksPerPage = 10;
 
     // Helper: fetch books for a query + page with cancellation and caching
-    const fetchBooks = async (query, page = 1) => {
-        if (!query) return;
+    const fetchBooks = async (query, page = 1, year = null, category = null, availability = null) => {
+        // Allow search with just filters (no query required)
+        if (!query && !year && !category && !availability) return;
 
-        const cacheKey = `${query}:${page}`;
+        const cacheKey = `${query}:${page}:${year}:${category}:${availability}`;
         if (cacheRef.current.has(cacheKey)) {
             const cached = cacheRef.current.get(cacheKey);
             setBooks(cached.books);
@@ -34,16 +38,21 @@ export default function Home({setUser}) {
         // cancel previous
         try {
             abortRef.current?.abort();
-        } catch (e) { /* ignore */ }
+        } catch (e) { console.warn("Abort error (likely from already completed request):", e);}
 
         const controller = new AbortController();
         abortRef.current = controller;
 
         setLoading(true);
-        console.log(`🏠 Home: fetching for "${query}"`);
+        console.log(`🏠 Home: fetching for "${query || '(no query)'}" with filters - year: ${year}, category: ${category}, availability: ${availability}`);
         try {
+            const params = { page };
+            if (query) params.q = query;
+            if (year) params.year = year;
+            if (category) params.category = category;
+            if (availability) params.availability = availability;
             const res = await axios.get("/api/search", {
-                params: { q: query, page },
+                params,
                 signal: controller.signal,
             });
 
@@ -61,12 +70,12 @@ export default function Home({setUser}) {
         }
     };
 
-    // Trigger fetch when query or page changes
+    // Trigger fetch when query, page, or filters change
     useEffect(() => {
         if (!currentQuery) return;
-        fetchBooks(currentQuery, currentPage);
+        fetchBooks(currentQuery, currentPage, currentYear, currentCategory, currentAvailability);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentQuery, currentPage]);
+    }, [currentQuery, currentPage, currentYear, currentCategory, currentAvailability]);
 
     // On mount pick an initial random query
     useEffect(() => {
@@ -87,10 +96,13 @@ export default function Home({setUser}) {
         };
     }, []);
 
-    const handleSearchResults = (results, total) => {
+    const handleSearchResults = (results, total, year = null, category = null, availability = null) => {
         setBooks(results);
         setTotalResults(total);
         setCurrentPage(1);
+        setCurrentYear(year);
+        setCurrentCategory(category);
+        setCurrentAvailability(availability);
     };
 
     const totalPages = Math.ceil(totalResults / booksPerPage);

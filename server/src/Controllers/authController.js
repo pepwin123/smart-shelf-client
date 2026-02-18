@@ -32,7 +32,7 @@ export const login = async (req, res) => {
 
   } catch (error) {
     console.error("LOGIN ERROR:", error);
-    return res.status(500).json({ success: false, message: "Login failed", error: error.message });
+    return res.status().json({ success: false, message: "Login failed", error: error.message });
   }
 };
 
@@ -82,7 +82,7 @@ export const signup = async (req, res) => {
       message: "User created successfully",
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status().json({
       success: false,
       message: "Signup failed",
       error: error.message,

@@ -49,13 +49,30 @@ router.get("/", async (req, res) => {
 
     let books = [];
 
-    // Try Google Books API first (with simple caching and retry on 429) - only if we have a query
-    if (q) {
+    // Determine search query for Google Books
+    // If no query provided, use a generic broad search based on filters
+    let googleSearchQuery = q;
+    if (!q) {
+      // If only filters provided, create a generic search query
+      if (category) {
+        googleSearchQuery = category; // Search by category
+      } else if (year) {
+        googleSearchQuery = "*"; // Broad search to filter by year
+      } else if (availability === "readable") {
+        googleSearchQuery = "book"; // Generic search for readable books
+      }
+    }
+
+    // Try Google Books API if we have a search query
+    if (googleSearchQuery) {
       try {
         const perPageInt = Math.min(Math.max(parseInt(perPage, 10) || 20, 1), 40);
         const pageInt = Math.max(parseInt(page, 10) || 1, 1);
         const startIndex = (pageInt - 1) * perPageInt;
-        const cacheKey = `search:${q}:${pageInt}:perPage:${perPageInt}`;
+        
+        // Build basic search query (Google Books doesn't support advanced filters in query)
+        // We'll apply year/category filters post-fetch
+        const cacheKey = `search:${googleSearchQuery}:${pageInt}:perPage:${perPageInt}`;
 
         // Return cached result if present and not expired
         const cached = searchCache.get(cacheKey);
@@ -70,13 +87,13 @@ router.get("/", async (req, res) => {
           while (attempt < maxAttempts) {
             try {
               const params = {
-                q,
+                q: googleSearchQuery,
                 startIndex,
                 maxResults: perPageInt,
                 orderBy: "relevance",
                 ...(GOOGLE_API_KEY ? { key: GOOGLE_API_KEY } : {}),
               };
-              console.log(`   📡 Requesting: ${url}?q=${q}&key=${GOOGLE_API_KEY ? 'SET' : 'MISSING'}`);
+              console.log(`   📡 Requesting Google Books: q="${googleSearchQuery}" page=${pageInt}`);
               response = await axios.get(url, { params });
               break; // success
             } catch (err) {
@@ -118,15 +135,21 @@ router.get("/", async (req, res) => {
                 pageCount: volumeInfo.pageCount || 0,
                 categories: volumeInfo.categories || [],
                 language: volumeInfo.language || "en",
+                previewLink: volumeInfo.previewLink || null,
               };
             }).filter((book) => {
               // ✅ Filter: Only include books where search query matches title or author
-              const queryLower = q.toLowerCase();
-              const titleMatch = book.title?.toLowerCase().includes(queryLower);
-              const authorMatch = book.author_name?.some(author => 
-                author.toLowerCase().includes(queryLower)
-              );
-              return titleMatch || authorMatch;
+              // Only filter by query if q was originally provided (not a generated filter query)
+              if (q) {
+                const queryLower = q.toLowerCase();
+                const titleMatch = book.title?.toLowerCase().includes(queryLower);
+                const authorMatch = book.author_name?.some(author => 
+                  author.toLowerCase().includes(queryLower)
+                );
+                return titleMatch || authorMatch;
+              }
+              // If no original query, include all books (filters will be applied later)
+              return true;
             });
 
             // cache the search results
@@ -194,31 +217,51 @@ router.get("/", async (req, res) => {
       console.error("❌ Local books query error:", err.message);
     }
 
-    // Apply filters to Google Books results
+    // Apply filters to all results (Google Books + local)
     books = books.filter((book) => {
-      // Year filter
+      // Year filter: check if book's publish year matches the filter
       if (yearNum) {
         const bookYear = book.first_publish_year;
-        if (!bookYear || bookYear < yearNum || bookYear > yearNum + 1) {
-          return false;
+        // If book has no year info, include it anyway
+        // Otherwise require the year to match (within 1 year range)
+        if (bookYear) {
+          if (bookYear < yearNum || bookYear > yearNum) {
+            return false;
+          }
         }
       }
 
-      // Category filter
+      // Category filter: check if book's categories include the filtered category
       if (category) {
         const bookCategories = book.categories || [];
+        // Use flexible matching: check if filter term is in any category
         const categoryMatch = bookCategories.some(cat =>
-          cat.toLowerCase().includes(category.toLowerCase())
+          cat.toLowerCase().includes(category.toLowerCase()) ||
+          category.toLowerCase().includes(cat.toLowerCase())
         );
-        if (!categoryMatch) {
+        // Exclude only if book has categories AND none match the filter
+        // If book has no categories, let it through (we don't have category info)
+        if (bookCategories.length > 0 && !categoryMatch) {
+          console.log(`   ❌ Filtering out "${book.title}" - categories: ${JSON.stringify(bookCategories)}, filter: ${category}`);
           return false;
+        }
+        if (categoryMatch) {
+          console.log(`   ✅ Keeping "${book.title}" - matches category filter`);
         }
       }
 
-      // Availability filter
+      // Availability filter: check if book has readable content
       if (availability === "readable") {
-        if (!book.hasPreview && !book._manual) {
-          return false;
+        // For manual books, check hasPreview
+        if (book._manual) {
+          if (!book.hasPreview) {
+            return false;
+          }
+        } else {
+          // For Google Books, check previewLink
+          if (!book.previewLink) {
+            return false;
+          }
         }
       }
 

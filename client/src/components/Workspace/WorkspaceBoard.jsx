@@ -37,7 +37,6 @@ function DraggableCard({ id, card, columnId, onDelete }) {
 
   const handleViewBook = (e) => {
     e.stopPropagation();
-    // Encode bookId to handle slashes in Open Library keys
     const encodedBookId = encodeURIComponent(card.bookId);
     console.log("Opening reader with bookId:", card.bookId, "encoded:", encodedBookId);
     navigate(`/reader/${encodedBookId}`, {

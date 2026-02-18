@@ -1,15 +1,19 @@
+
 # Smart-Shelf: Collaborative Research Engine
 
-🚀 A full-stack web application for researchers to discover, organize, and collaborate on open-access books with real-time updates and shared research notes.
+🚀 A full-stack web application for researchers to discover, organize, and collaborate on open-access books with real-time updates, shared research notes, and advanced reading features.
+
 
 ## Features
 
-- 🔍 **Advanced Book Discovery** - Search millions of books with filters (year, subject, availability)
-- 📚 **Trello-Style Workspace** - Organize books in "To Read", "Reading", "Cited" columns with drag-and-drop
-- 👥 **Real-Time Collaboration** - Invite team members and see updates instantly via WebSocket
-- 📖 **Embedded Reader** - Read books directly with Google Books previewer
-- 📝 **Research Notes** - Create Markdown notes attached to specific chapters/pages
-- 💾 **Smart Caching** - 30-day cache for book metadata with automatic optimization
+- 🔍 **Advanced Book Discovery**: Search millions of books with filters (year, subject, availability)
+- 📚 **Trello-Style Workspace**: Organize books in "To Read", "Reading", "Cited" columns with drag-and-drop
+- 👥 **Real-Time Collaboration**: Invite team members and see updates instantly via WebSocket
+- 📖 **Embedded Reader**: Read books directly with Google Books previewer or local file preview (PDF, TXT, MD)
+- 📝 **Research Notes**: Create Markdown notes attached to specific chapters/pages
+- 💾 **Smart Caching**: 30-day cache for book metadata with automatic optimization
+- 🗂️ **Local File Support**: Upload and preview local PDF and text files in the reader
+- 🧩 **Custom Reader Hooks**: Modular hooks for Google Books and local file preview logic
 
 ## Quick Start
 
@@ -58,25 +62,49 @@ Visit http://localhost:5173
 
 **Backend:** Node.js, Express, MongoDB, Socket.IO, JWT
 
-**APIs:** Google Books API, Open Library API
+**APIs:** Google Books API
+
 
 ## Project Structure
 
 ```
 ├── client/                 # React frontend
-│   └── src/components/
-│       ├── Reader/        # Book viewer with notes
-│       ├── Workspace/     # Kanban board
-│       ├── Searchbar/     # Discovery engine
-│       └── Auth/          # Login/Register
+│   ├── public/             # Static assets
+│   └── src/
+│       ├── api/            # API utilities
+│       ├── assets/         # Images and icons
+│       ├── components/
+│       │   ├── Reader/         # Book viewer, Google Books integration, local file preview
+│       │   │   ├── useReaderHooks.js  # Custom hooks for Google Books and local file preview
+│       │   │   ├── ReaderViewport.jsx # Main reader viewport UI
+│       │   │   └── ...
+│       │   ├── Workspace/      # Kanban board
+│       │   ├── Searchbar/      # Book search and results
+│       │   └── Auth/           # Login/Register
+│       └── App.jsx, main.jsx   # App entry points
 │
 └── server/                # Express backend
     └── src/
         ├── Controllers/   # Business logic
+        ├── Middleware/    # Auth and error handling
         ├── Models/        # MongoDB schemas
         ├── Router/        # API routes
-        └── Config/        # Server config & Socket.IO
+        ├── Config/        # Server config & Socket.IO
+        └── __tests__/     # Backend tests
 ```
+## Reader Component & Hooks
+
+The `Reader` feature supports both Google Books previews and local file previews (PDF, TXT, MD, LOG). It uses custom hooks for modular logic:
+
+- **useReaderHooks.js**
+    - `useGoogleBooksViewer`: Handles Google Books Embedded Viewer initialization, loading, and cleanup.
+    - `useLocalFilePreview`: Fetches and previews local text files (txt, md, log) for uploaded books.
+- **ReaderViewport.jsx**: Displays the viewer, local file preview, loading/error states, and fallback book info.
+
+**How it works:**
+- If a Google Books preview is available, it is embedded in the app.
+- If a local file (PDF or text) is uploaded, it is previewed directly in the reader.
+- Loading and error states are handled for a smooth user experience.
 
 ## Key Endpoints
 
@@ -86,10 +114,10 @@ Visit http://localhost:5173
 | POST | `/api/users/login` | Login user |
 | GET | `/api/search?q=query` | Search books |
 | POST | `/api/workspaces` | Create workspace |
-| PATCH | `/api/workspaces/:id/move-card` | Move card |
-| POST | `/api/workspaces/:id/collaborators` | Add collaborator |
+| PATCH | `/api/workspaces/:id/move-card` | Move card between columns |
+| POST | `/api/workspaces/:id/collaborators` | Add collaborator to workspace |
 | POST | `/api/notes` | Create research note |
-| GET | `/api/notes/book/:volumeId` | Get book notes |
+| GET | `/api/notes/book/:volumeId` | Get notes for a book |
 
 ## Real-Time Features
 
@@ -121,3 +149,8 @@ Visit http://localhost:5173
 3. Commit changes (`git commit -m 'Add feature'`)
 4. Push branch (`git push origin feature/amazing`)
 5. Open Pull Request
+
+
+## License
+
+This project is licensed under the MIT License.

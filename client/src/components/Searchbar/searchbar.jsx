@@ -38,10 +38,10 @@ export default function SearchBar({ onResults }) {
       }
 
       const res = await axios.get("/api/search", { params });
-      onResults(res.data.books || [], res.data.count || 0);
+      onResults(res.data.books || [], res.data.count || 0, searchYear, searchCategory, searchAvailability);
     } catch (err) {
       setError("Search failed. Please try again.");
-      onResults([], 0);
+      onResults([], 0, searchYear, searchCategory, searchAvailability);
       console.error("Search error:", err);
     } finally {
       setLoading(false);
@@ -66,7 +66,8 @@ export default function SearchBar({ onResults }) {
     const newCategory = e.target.value;
     setCategory(newCategory);
     // Trigger search with current query and new category filter
-    performSearch(query, year, newCategory, availability);
+    // Use the new category value directly since state hasn't updated yet
+    performSearch(query || "", year, newCategory, availability);
   };
 
   const handleAvailabilityChange = (e) => {
