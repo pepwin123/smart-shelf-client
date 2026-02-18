@@ -25,18 +25,19 @@ export const useGoogleBooksViewer = (bookId, locationISBNs, volumeAccess, bookIn
         if (bookId.includes("-")) identifiers.push(bookId.replace(/-/g, "/"));
         if (bookId.startsWith("-")) identifiers.push(bookId.slice(1));
       }
+
       if (locationISBNs && locationISBNs.length > 0) {
         locationISBNs.forEach((isbn) => identifiers.push(`ISBN:${isbn}`));
       }
 
-      
-
+      //book in local file upload format - skip viewer
       if (bookId && (bookId.startsWith("manual-") || (bookInfo?.previewLink && bookInfo.previewLink.includes("/uploads/")))) {
         setViewer(null);
         setIsLoading(false);
         return;
       }
 
+      // If no valid identifiers, skip viewer
       if (!identifiers || identifiers.length === 0) {
         console.warn("No valid identifiers available for Google Books viewer; skipping load.");
         setViewer(null);

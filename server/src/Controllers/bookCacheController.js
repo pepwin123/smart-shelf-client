@@ -1,6 +1,12 @@
 import axios from "axios";
 import BookCache from "../Models/bookCacheModel.js";
 
+// Normalize an identifier (ISBN/ISSN/OTHER): remove spaces/hyphens, uppercase
+function normalizeIdentifier(id) {
+  if (!id) return null;
+  return String(id).replace(/[^0-9A-Za-zXx]/g, "").toUpperCase();
+}
+
 // Get book details with caching (Google Books)
 export const getBookDetails = async (req, res, next) => {
   try {
@@ -39,6 +45,15 @@ export const getBookDetails = async (req, res, next) => {
       const volumeInfo = response.data.volumeInfo;
       const accessInfo = response.data.accessInfo;
 
+      const identifiers = (volumeInfo.industryIdentifiers || []).map(i => ({
+        type: i.type,
+        identifier: normalizeIdentifier(i.identifier),
+      }));
+
+      const issn = identifiers.find(i => i.type && i.type.toUpperCase().includes('ISSN'))?.identifier || null;
+      const isbn10 = identifiers.find(i => i.type === 'ISBN_10')?.identifier || null;
+      const isbn13 = identifiers.find(i => i.type === 'ISBN_13')?.identifier || null;
+
       const cachedBook = await BookCache.create({
         googleBooksVolumeId,
         title: volumeInfo.title,
@@ -51,8 +66,12 @@ export const getBookDetails = async (req, res, next) => {
         description: volumeInfo.description,
         language: volumeInfo.language,
         publisher: volumeInfo.publisher,
-        isbn10: volumeInfo.industryIdentifiers?.find(id => id.type === "ISBN_10")?.identifier,
-        isbn13: volumeInfo.industryIdentifiers?.find(id => id.type === "ISBN_13")?.identifier,
+        // normalized ISBNs (if present)
+        isbn10: isbn10,
+        isbn13: isbn13,
+        // store ISSN (for serials) and all normalized industry identifiers
+        issn: issn,
+        industryIdentifiers: identifiers,
         ratingsAverage: volumeInfo.averageRating,
         ratingsCount: volumeInfo.ratingsCount,
         accessInfo: {

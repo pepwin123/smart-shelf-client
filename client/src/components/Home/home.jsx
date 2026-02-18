@@ -12,35 +12,69 @@ export default function Home({setUser}) {
     const [showAddModal, setShowAddModal] = useState(false);
     const [loading, setLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
+    const [currentQuery, setCurrentQuery] = useState(null);
     const [totalResults, setTotalResults] = useState(0);
     const socketRef = useRef(null);
+    const abortRef = useRef(null);
+    const cacheRef = useRef(new Map());
     const booksPerPage = 10;
 
-    // Fetch random books on component mount
-    useEffect(() => {
-        const fetchRandomBooks = async () => {
-            setLoading(true);
-            try {
-                const queries = ["fiction", "science", "history", "technology", "adventure"];
-                const randomQuery = queries[Math.floor(Math.random() * queries.length)];
-                console.log(`🏠 Home: fetching for "${randomQuery}"`);
-                
-                const res = await axios.get("http://localhost:5000/api/search", {
-                    params: { q: randomQuery, page: currentPage }
-                });
-                
-                console.log(`📚 Home received: ${res.data.books?.length || 0} books`);
-                setBooks(res.data.books || []);
-                setTotalResults(res.data.count || 0);
-            } catch (error) {
-                console.error("❌ Home fetch error:", error.response?.data || error.message);
-            } finally {
-                setLoading(false);
-            }
-        };
+    // Helper: fetch books for a query + page with cancellation and caching
+    const fetchBooks = async (query, page = 1) => {
+        if (!query) return;
 
-        fetchRandomBooks();
-    }, [currentPage]);
+        const cacheKey = `${query}:${page}`;
+        if (cacheRef.current.has(cacheKey)) {
+            const cached = cacheRef.current.get(cacheKey);
+            setBooks(cached.books);
+            setTotalResults(cached.count);
+            return;
+        }
+
+        // cancel previous
+        try {
+            abortRef.current?.abort();
+        } catch (e) { /* ignore */ }
+
+        const controller = new AbortController();
+        abortRef.current = controller;
+
+        setLoading(true);
+        console.log(`🏠 Home: fetching for "${query}"`);
+        try {
+            const res = await axios.get("/api/search", {
+                params: { q: query, page },
+                signal: controller.signal,
+            });
+
+            console.log(`📚 Home received: ${res.data.books?.length || 0} books`);
+            setBooks(res.data.books || []);
+            setTotalResults(res.data.count || 0);
+
+            cacheRef.current.set(cacheKey, { books: res.data.books || [], count: res.data.count || 0 });
+        } catch (error) {
+            // ignore cancellations
+            if (error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError' || error?.message === 'canceled') return;
+            console.error("❌ Home fetch error:", error.response?.data || error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Trigger fetch when query or page changes
+    useEffect(() => {
+        if (!currentQuery) return;
+        fetchBooks(currentQuery, currentPage);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentQuery, currentPage]);
+
+    // On mount pick an initial random query
+    useEffect(() => {
+        const queries = ["fiction", "science", "history", "technology", "adventure"];
+        const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+        setCurrentQuery(randomQuery);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Initialize Socket.IO connection using a ref to avoid sync setState in effect
     useEffect(() => {
@@ -74,7 +108,29 @@ export default function Home({setUser}) {
                         <SearchBar onResults={handleSearchResults} />
                     </div>
                     <div className="w-full lg:w-auto">
-                        <button onClick={() => setShowAddModal(true)} className="w-full lg:w-auto bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Manual Book</button>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => setShowAddModal(true)} className="w-full lg:w-auto bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Manual Book</button>
+                                                    <button onClick={() => {
+                                                        const queries = ["fiction","science","history","technology","adventure"];
+                                                        // Prefer a different topic than the current one
+                                                        let q = currentQuery;
+                                                        let attempts = 0;
+                                                        while ((q === currentQuery) && attempts < 6) {
+                                                            q = queries[Math.floor(Math.random() * queries.length)];
+                                                            attempts += 1;
+                                                        }
+                                                        // Reset to page 1 and set the new query
+                                                        setCurrentPage(1);
+                                                        // Force a state change even if q equals currentQuery by clearing then setting
+                                                        if (q === currentQuery) {
+                                                            setCurrentQuery(null);
+                                                            // small delay to ensure effect sees a change
+                                                            setTimeout(() => setCurrentQuery(q), 0);
+                                                        } else {
+                                                            setCurrentQuery(q);
+                                                        }
+                                                    }} className="w-full lg:w-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Random</button>
+                                                </div>
                     </div>
                 </div>
             </div>
